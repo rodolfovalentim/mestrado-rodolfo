@@ -69,7 +69,7 @@ class KeyflowController(app_manager.RyuApp):
         parser = datapath.ofproto_parser
 
         # install the table-miss flow entry.
-        match = parser.OFPMatch(in_port=port, eth_dst='90:00:00:00:00:00')
+        match = parser.OFPMatch(in_port=port, eth_src='90:00:00:00:00:00')
         actions = [parser.OFPActionOutput(2 % 2, ofproto.OFPCML_NO_BUFFER)]
         self.add_flow(datapath, 0, match, actions)
         return
