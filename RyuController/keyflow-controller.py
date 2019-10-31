@@ -3,11 +3,16 @@ from ryu.controller import ofp_event
 from ryu.controller.handler import (CONFIG_DISPATCHER, MAIN_DISPATCHER,
                                     set_ev_cls)
 from ryu.lib.packet import arp, ethernet, icmp, ipv4, packet
-from ryu.ofproto import ofproto_v1_3
+from ryu.ofproto import (ofproto_v1_0, ofproto_v1_2, ofproto_v1_3,
+                         ofproto_v1_4, ofproto_v1_5)
 
 
 class KeyflowController(app_manager.RyuApp):
-    OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
+    OFP_VERSIONS = [ofproto_v1_0.OFP_VERSION,
+                    ofproto_v1_2.OFP_VERSION,
+                    ofproto_v1_3.OFP_VERSION,
+                    ofproto_v1_4.OFP_VERSION,
+                    ofproto_v1_5.OFP_VERSION]
 
     def __init__(self, *args, **kwargs):
         super(KeyflowController, self).__init__(*args, **kwargs)
@@ -69,7 +74,8 @@ class KeyflowController(app_manager.RyuApp):
         parser = datapath.ofproto_parser
 
         # install the table-miss flow entry.
-        match = parser.OFPMatch(in_port=port, eth_src='90:00:00:00:00:00')
+        match = parser.OFPMatch(
+            in_port=port, eth_src=("aa:bb:cc:11:22:33", "00:00:00:00:ff:ff"))
         actions = [parser.OFPActionOutput(2 % 2, ofproto.OFPCML_NO_BUFFER)]
         self.add_flow(datapath, 0, match, actions)
         return
