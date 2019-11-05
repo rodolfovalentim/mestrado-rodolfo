@@ -1,0 +1,38 @@
+FROM centos:centos7
+
+# Install git
+RUN yum update \        
+    yum install -y git \
+    yum install @'Development Tools' rpm-build yum-utils
+
+RUN git clone https://github.com/openvswitch/ovs.git
+
+WORKDIR /ovs
+RUN git checkout v2.11.0
+RUN sed -e 's/@VERSION@/0.0.1/' rhel/openvswitch.spec.in > /tmp/ovs.spec
+RUN yum-builddep  -y /tmp/ovs.spec
+RUN rm /tmp/ovs.spec
+
+RUN yum install -y desktop-file-utils \
+    groff \
+    graphviz \
+    python-twisted-core \
+    python-zope-interface \
+    libcap-ng-devel \
+    unbound \
+    iproute
+
+RUN ./boot.sh; \
+    ./configure --prefix=/usr --localstatedir=/var --sysconfdir=/etc; \
+    make rpm-fedora RPMBUILD_OPT="--without check"
+
+RUN yum install -y python-netifaces \
+    libreswan
+
+RUN rpm -i rpm/rpmbuild/RPMS/x86_64/openvswitch-2.11.0-1.el7.x86_64.rpm
+RUN rpm -i rpm/rpmbuild/RPMS/noarch/python-openvswitch-2.11.0-1.el7.noarch.rpm
+RUN rpm -i rpm/rpmbuild/RPMS/x86_64/openvswitch-ipsec-2.11.0-1.el7.x86_64.rpm
+
+ENV PATH=$PATH:"/usr/share/openvswitch/scripts"
+RUN ovs-ctl start
+

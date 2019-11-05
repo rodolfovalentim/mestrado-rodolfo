@@ -93,7 +93,7 @@ sudo ovs-ofctl add-flow sw1 "actions=output=NORMAL"
 
 ```bash
 apt-get install dkms strongswan
-dpkg -i libopenvswitch*\*.deb openvswitch-common*_.deb \
+dpkg -i libopenvswitch*.deb openvswitch-common*_.deb \
  openvswitch-switch\__.deb openvswitch-datapath-dkms*\*.deb \
  python-openvswitch*_.deb openvswitch-pki\__.deb \
  openvswitch-ipsec\_\*.deb
