@@ -1,3 +1,3 @@
 # docker build . -t rodolfo/centos-source-openvswitch
 
-# docker run -it --net=host --name=ovs -v /lib:/lib --privileged ovsbuild /bin/bash
+# docker run -it --net=host --name=rodolfo-openvswitch -v /lib:/lib --privileged rodolfo/centos-source-openvswitch /bin/bash
