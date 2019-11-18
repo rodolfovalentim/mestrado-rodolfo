@@ -1,106 +1,44 @@
-import argparse
-import yaml
+import requests
+from utils import (Switch, GraphUndirectedWeighted)
 
-
-class Switch(object):
-    self.host
-    self.switch_type
-    self.dpid
-    self.ports
-    self.flows
-
-
-class EdgeController(object):
-    self.endpoint
-    self.port
-    self.switches
-
-
-class CoreController(object):
-    self.endpoint
-    self.port
-    self.switches
-
-
-class SFCGateway(object):
-    self.endpoint
-    self.port
-
-
-class Cloud(object):
-    self.endpoint
-    self.user
-    self.passwd
-    self.region
-    self.cloud_name
-    self.edge_controller
-    self.core_controller
-    self.sfc_gateway
-
-
-class FlowClassifier(object):
-    self.description
-    self.source_cloud
-    self.source_ip
-    self.source_port
-    self.source_host
-    self.source_tap
-    self.destination_cloud
-    self.destination_ip
-    self.destination_port
-    self.destination_host
-    self.destination_tap
-    self.protocol
-
-
-class VirtualFunction(object):
-    self.cloud
-    self.host
-    self.name
-    self.description
-
-
-class ForwardingGraph(object):
-    self.graph
-    self.description
-
-
-class Chain(object):
-    self.flow_classifier
-    self.vnffg
-    self.description
+endpoint_core_controller = 'http://192.168.0.15'
+topology_port = '8081'
+switches_path = '/v1.0/topology/switches'
+links_path = '/v1.0/topology/links'
 
 
 class Orquestrator(object):
-    self.clouds
-    self.chains
 
-    def create_sfc(chain: Chain):
-        # verify or create source and destination
-        self.handle_flow_classifier(chain.flow_classifier)
-        # create and verify vnfs info
-        # get switches of core and edge in the chain
-        core_switches, edge_switches = self.handle_vnffg(chain.vnffg)
-        # get port topology
-        topology = self.get_topology()
-        # calculate chain key
-        key = self.handle_routing(topology)
-        # install flow in the edge switches in the chain
-        return self.__create_sfc(edge_switches, key, chain.flow_classifier)
+    switches_end = 'http://192.168.0.15:8081/v1.0/topology/switches'
+    links_end = 'http://192.168.0.15:8081/v1.0/topology/links'
 
-    def remove_sfc():
-        # remove flows
-        # remomve
-        pass
+    switches = None
+    link = None
+    graph = None
 
-    def update_sfc():
-        pass
+    def get_topology(self):
+        r_switches = requests.get(self.switches_end)
+        r_links = requests.get(self.links_end)
 
-    def get_sfc():
-        pass
+        self.switches = []
+        for switch in r_switches.json():
+            self.switches.append(Switch(switch.get('dpid')))
+
+        self.graph = GraphUndirectedWeighted(self.switches)
+
+        for link in r_links.json():
+            self.graph.add_edge(link.get('src').get('dpid'),
+                                link.get('dst').get('dpid'), 1)
+
+    def get_hop_path(self, edge_source, edge_destination, recheck=False):
+        if recheck:
+            self.get_topology()
+
+        return self.graph.dijkstra(edge_source, edge_destination)
 
 
 if __name__ == "__main__":
 
-    fc = FlowClassifier()
-    fc.
+    orq = Orquestrator()
+    orq.get_topology()
+    orq.get_hop_path('0000000000000002', "0000000000000003")
