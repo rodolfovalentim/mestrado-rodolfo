@@ -1,0 +1,19 @@
+clouds:
+  nuvem01:
+    region_name: RegionOne
+    auth:
+      username: 'admin'
+      password: 'stack'
+      project_name: 'admin'
+      auth_url: 'http://192.168.0.40:5000/v3'
+      project_domain_name: "Default"
+      user_domain_name: "Default"
+  nuvem02:
+    region_name: RegionOne
+    auth:
+      username: 'admin'
+      password: 'stack'
+      project_name: 'admin'
+      auth_url: 'http://192.168.0.50:5000/v3'
+      project_domain_name: "Default"
+      user_domain_name: "Default"

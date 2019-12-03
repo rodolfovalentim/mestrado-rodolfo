@@ -1,4 +1,5 @@
 from ryu.base import app_manager
+from ryu.app.wsgi import ControllerBase, WSGIApplication, route
 from ryu.controller import ofp_event
 from ryu.controller.handler import (CONFIG_DISPATCHER, MAIN_DISPATCHER,
                                     set_ev_cls)
@@ -6,8 +7,28 @@ from ryu.lib.packet import arp, ethernet, icmp, ipv4, packet
 from ryu.ofproto import (ofproto_v1_0, ofproto_v1_2, ofproto_v1_3,
                          ofproto_v1_4, ofproto_v1_5)
 
+import json
+import logging
+
+from ryu.app.wsgi import ControllerBase, WSGIApplication, route
+from ryu.base import app_manager
+from ryu.ofproto import ofproto_v1_0
+from ryu.topology.api import get_switch
+from webob import Response
+
+
+LOG = logging.getLogger(__name__)
+LOG.setLevel(logging.DEBUG)
+logging.basicConfig()
+
+edge_instance_name = 'edge_api_app'
 
 class KeyflowController(app_manager.RyuApp):
+
+    _CONTEXTS = {
+        'wsgi': WSGIApplication
+    }
+
     OFP_VERSIONS = [ofproto_v1_0.OFP_VERSION,
                     ofproto_v1_2.OFP_VERSION,
                     ofproto_v1_3.OFP_VERSION,
@@ -16,8 +37,8 @@ class KeyflowController(app_manager.RyuApp):
 
     def __init__(self, *args, **kwargs):
         super(KeyflowController, self).__init__(*args, **kwargs)
-        self.ip_to_ether = {
-            "10.0.0.1": "2a:54:59:60:bb:15", "10.0.0.2": "3a:3f:43:e2:b0:38"}
+        wsgi = kwargs['wsgi']
+        wsgi.register(RestController, {edge_instance_name: self})
 
     # This method add a flow to send every packet to controller
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
@@ -75,7 +96,7 @@ class KeyflowController(app_manager.RyuApp):
 
         # install the table-miss flow entry.
         match = parser.OFPMatch(
-            in_port=port, eth_src=("aa:bb:cc:11:22:33", "00:00:00:00:ff:ff"))
+            in_port=port, eth_dst=("aa:bb:cc:11:22:33", "00:00:00:00:ff:ff"))
         actions = [parser.OFPActionOutput(2 % 2, ofproto.OFPCML_NO_BUFFER)]
         self.add_flow(datapath, 0, match, actions)
         return
@@ -105,3 +126,20 @@ class KeyflowController(app_manager.RyuApp):
                                   actions=actions,
                                   data=data)
         datapath.send_msg(out)
+
+
+class RestController(ControllerBase):
+    def __init__(self, req, link, data, **config):
+        super(RestController, self).__init__(req, link, data, **config)
+        self.edge_app = data[edge_instance_name]
+
+    @route('nodes', '/switches', methods=['GET'])
+    def get_nodes(self, req, **kwargs):
+        return self._switches()
+
+    def _switches(self):
+        dpid = None
+        switches = get_switch(self.edge_app, dpid)
+        body = [{'dpid': hex(switch.dp.id)[2:].zfill(16), 'ip': switch.dp.socket.getpeername()[0]} for switch in switches]
+        print(body)
+        return Response(content_type='application/json', json=body)
