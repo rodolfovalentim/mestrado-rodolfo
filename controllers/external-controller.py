@@ -135,7 +135,7 @@ class RestController(ControllerBase):
 
     @route('get', '/ip2dp/{ip}', methods=['GET'])
     def get_ip(self, req, ip, **kwargs):
-        dpid = self.external_app.ip_to_dpid[ip]
+        dpid = self.external_app.ip_to_dpid.get(ip, None)
         if dpid is not None:
             body = {'ip': ip, 'dpid': dpid}
             return Response(content_type='application/json', json=body, status=200)

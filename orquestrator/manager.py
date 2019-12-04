@@ -12,27 +12,28 @@ if __name__ == "__main__":
     edge_ctrl = EdgeController(
         endpoint="127.0.0.1", port="6636", wsgi_port="8082")
     ext_ctrl = ExternalController(
-        endpoint="127.0.0.1", port="6636", wsgi_port="8082")
+        endpoint="127.0.0.1", port="6637", wsgi_port="8083")
 
     cloud = Cloud()
     cloud.set_topology_controller(topo_ctrl)
     cloud.set_core_controller(core_ctrl)
     cloud.set_edge_controller(edge_ctrl)
+    cloud.set_external_controller(ext_ctrl)
 
-    pprint(cloud.get_switches())
-    pprint(cloud.get_links())
-    pprint(cloud.get_virtual_machines())
+    # pprint(cloud.get_switches())
+    # pprint(cloud.get_links())
+    # pprint(cloud.get_virtual_machines())
+    # pprint(cloud.get_vm_ports("nuvem01"))
+    orq = Orquestrator()
+    orq.cloud = cloud
 
-    # orq = Orquestrator()
-    # orq.cloud = cloud
-
-    # flow_classifier = orq.create_flow_classifier({
-    #     'source_ip': '10.0.101.17',
-    #     'source_port': 80,
-    #     'destination_ip': '10.0.101.15',
-    #     'destination_port': 80,
-    #     'protocol': 'udp',
-    # })
+    flow_classifier = orq.create_flow_classifier(**{
+        'source_ip': '10.0.0.3',
+        'source_port': 80,
+        'destination_ip': '10.0.101.15',
+        'destination_port': 80,
+        'protocol': 'udp',
+    })
 
     # nat = orq.create_virtual_function(
     #     name='src', compute_host='compute01', vnf_type="nat", cloud='nuvem01')

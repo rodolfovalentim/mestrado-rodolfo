@@ -8,16 +8,19 @@ from openstack.config import loader
 import sys
 from prettyprinter import pprint
 from netaddr import IPNetwork
+from requests_futures import sessions
+
 
 # openstack.enable_logging(True, stream=sys.stdout)
 Edge = namedtuple('Edge', ['vertex', 'weight'])
 
+
 class KeyFlowAgent(object):
-    
+
     @staticmethod
     def chinese_remainder(n, a):
         """ Calcula a chave key flow.
-        entrada: 
+        entrada:
         n: lista ordenada do ids dos swiches
         a: lista ordenada das portas em que vai sair
         saida:
@@ -36,7 +39,8 @@ class KeyFlowAgent(object):
         b0 = b
         x0 = 0
         x1 = 1
-        if b == 1: return 1
+        if b == 1:
+            return 1
         while a > 1:
             q = a // b
             a, b = b, a % b
@@ -47,17 +51,21 @@ class KeyFlowAgent(object):
 
 # print(chinese_remainder([11, 19], [7, 5]), hex(chinese_remainder([11, 19], [7, 5])))
 
+
 class Tap(object):
     def __init__(self, *args, **kwargs):
         self.uuid = kwargs.get('id', None)
         self.mac_address = kwargs.get('mac_address', None)
         self.name = "qvo" + kwargs.get('id', None)[0:11]
+        self.binded_host = kwargs.get('binding_host_id', None)
+
         fixed_ips = kwargs.get('fixed_ips', None)
         if fixed_ips is not None and len(fixed_ips) > 0:
             self.ip = fixed_ips[0].get("ip_address")
 
     def __repr__(self):
         return 'Tap {}'.format(self.__dict__)
+
 
 class VirtualMachine(object):
     def __init__(self, *args, **kwargs):
@@ -73,16 +81,16 @@ class VirtualMachine(object):
         self.taps.append(tap)
 
 
-
 class Port(object):
     def __init__(self, *args, **kwargs):
         self.dpid = kwargs.get('dpid', None)
         self.port_no = kwargs.get('port_no', None)
         self.hw_addr = kwargs.get('hw_addr', None)
         self.name = kwargs.get('name', None)
-    
+
     def __repr__(self):
         return 'Port {}'.format(self.name)
+
 
 class Link(object):
     def __init__(self, *args, **kwargs):
@@ -97,12 +105,12 @@ class Switch(object):
     def __init__(self, *args, **kwargs):
         # self.controller = kwargs.get('controller', None)
         self.dpid = kwargs.get('dpid', None)
-        self.ports = [ Port(**port) for port in kwargs.get('ports') ]
+        self.ports = [Port(**port) for port in kwargs.get('ports')]
         self.switch_type = kwargs.get('switch_type', 'default')
 
         if (self.switch_type == 'core'):
             self.key = kwargs.get('key', None)
-        
+
     def __repr__(self):
         return 'Switch {}'.format(self.__dict__)
 
@@ -121,19 +129,90 @@ class Switch(object):
     def set_controller(self, controller):
         self.controller = controller
 
+
 class Flow(object):
 
     match = {}
     actions = []
 
-    def add_match_field(self, field, value):
-        self.match[field] = value
-
-    def add_action(self, action):
-        self.actions.append(action)
-
     def get_flow(self):
-        return { 'match': self.match, "actions": self.actions }
+        return {'match': self.match, "actions": self.actions}
+
+    def to_dict(self):
+        return {
+            "table": 0,
+            "match": json.loads(self.match),
+            "actions": json.loads(self.actions)
+        }
+
+    def add_match(self, match_type, *argv):
+        if match_type == 'in_port':
+            self.match['in_port'] = argv[0]
+        elif self.match_type == 'dl_src':
+            self.match['dl_src'] = argv[0]
+        elif self.match_type == 'dl_dst':
+            self.match['dl_dst'] = argv[0]
+        elif self.match_type == 'dl_vlan':
+            self.match['dl_vlan'] = argv[0]
+        elif self.match_type == 'dl_vlan_pcp':
+            self.match['dl_vlan_pcp'] = argv[0]
+            self.match['dl_vlan'] = argv[1]
+        elif self.match_type == 'dl_type':
+            self.match['dl_type'] = argv[0]
+        elif self.match_type == 'nw_tos':
+            self.match['nw_tos'] = argv[0]
+        elif self.match_type == 'nw_proto':
+            self.match['nw_proto'] = argv[0]
+            self.match['dl_type'] = 2048
+        elif self.match_type == 'nw_src':
+            self.match['nw_src'] = argv[0]
+            self.match['dl_type'] = 2048
+        elif self.match_type == 'nw_dst':
+            self.match['nw_dst'] = argv[0]
+            self.match['dl_type'] = 2048
+        elif self.match_type == 'tp_src':
+            self.match['tp_src'] = argv[0]
+            self.match['dl_type'] = 2048
+        elif self.match_type == 'tp_dst':
+            self.match['nw_proto'] = argv[0]
+            self.match['tp_dst'] = argv[1]
+            self.match['dl_type'] = 2048
+        elif self.match_type == 'udp_dst':
+            self.match['udp_dst'] = argv[0]
+            self.match['ip_proto'] = 17
+            self.match['eth_type'] = 2048
+        return self.match
+
+    def add_action(self, action_type, *argv):
+        actions = json.loads(self.actions)
+        if action_type == 'OUTPUT':
+            self.actions.append({'type': 'OUTPUT', 'port': argv[0]})
+        elif action_type == 'SET_VLAN_VID':
+            self.actions.append({'type': 'SET_VLAN_VID', 'vlan_vid': argv[0]})
+        elif action_type == 'SET_VLAN_PCP':
+            self.actions.append({'type': 'SET_VLAN_PCP', 'vlan_pcp': argv[0]})
+        elif action_type == 'STRIP_VLAN':
+            self.actions.append({'type': 'STRIP_VLAN'})
+        elif action_type == 'SET_DL_SRC':
+            self.actions.append({'type': 'SET_DL_SRC', 'dl_src': argv[0]})
+        elif action_type == 'SET_DL_DST':
+            self.actions.append({'type': 'SET_DL_DST', 'dl_dst': argv[0]})
+        elif action_type == 'SET_NW_SRC':
+            self.actions.append({'type': 'SET_NW_SRC', 'nw_src': argv[0]})
+        elif action_type == 'SET_NW_DST':
+            self.actions.append({'type': 'SET_NW_DST', 'nw_dst': argv[0]})
+        elif action_type == 'SET_NW_TOS':
+            self.actions.append({'type': 'SET_NW_TOS', 'nw_tos': argv[0]})
+        elif action_type == 'SET_TP_SRC':
+            self.actions.append({'type': 'SET_TP_SRC', 'tp_src': argv[0]})
+        elif action_type == 'SET_TP_DST':
+            self.actions.append({'type': 'SET_TP_DST', 'tp_dst': argv[0]})
+        elif action_type == 'ENQUEUE':
+            self.actions.append(
+                {'type': 'ENQUEUE', 'queue_id': argv[0], 'port': argv[1]})
+
+        return self.actions
+
 
 class Controller(object):
     def __init__(self, *args, **kwargs):
@@ -150,7 +229,8 @@ class TopologyController(Controller):
         self.wsgi_port = kwargs.get('wsgi_port', '8080')
 
     def get_switches(self):
-        url = "http://{}:{}/{}".format(self.endpoint, self.wsgi_port, self.switches_path)
+        url = "http://{}:{}/{}".format(self.endpoint,
+                                       self.wsgi_port, self.switches_path)
 
         try:
             response = requests.get(url)
@@ -159,27 +239,28 @@ class TopologyController(Controller):
         except requests.ConnectionError as e:
             print("OOPS!! Connection Error. Make sure you are connected to Internet. Technical Details given below.\n")
             print(str(e))
-            return        
+            return
 
         except requests.Timeout as e:
             print("OOPS!! Timeout Error")
             print(str(e))
-            return        
+            return
 
         except requests.RequestException as e:
             print("OOPS!! General Error")
             print(str(e))
-            return        
+            return
 
         except KeyboardInterrupt:
             print("Someone closed the program")
-            return        
+            return
 
         r_switches = response.json()
         return r_switches
 
-    def get_links(self):    
-        url = "http://{}:{}/{}".format(self.endpoint, self.wsgi_port, self.links_path)
+    def get_links(self):
+        url = "http://{}:{}/{}".format(self.endpoint,
+                                       self.wsgi_port, self.links_path)
         response = None
         try:
             response = requests.get(url)
@@ -187,22 +268,23 @@ class TopologyController(Controller):
         except requests.ConnectionError as e:
             print("OOPS!! Connection Error. Make sure you are connected to Internet. Technical Details given below.\n")
             print(str(e))
-            return        
+            return
         except requests.Timeout as e:
             print("OOPS!! Timeout Error")
             print(str(e))
-            return        
+            return
         except requests.RequestException as e:
             print("OOPS!! General Error")
             print(str(e))
-            return        
+            return
 
         except KeyboardInterrupt:
             print("Someone closed the program")
-            return        
+            return
 
         r_links = response.json()
         return r_links
+
 
 class CoreController(Controller):
     switches_path = 'switches'
@@ -216,32 +298,34 @@ class CoreController(Controller):
         pass
 
     def get_switch(self, dpid):
-        url = "http://{}:{}/{}/{}".format(self.endpoint, self.wsgi_port, self.switch_path, dpid)
+        url = "http://{}:{}/{}/{}".format(self.endpoint,
+                                          self.wsgi_port, self.switch_path, dpid)
 
-        try: 
+        try:
             response = requests.get(url)
             response.raise_for_status()
         except requests.ConnectionError as e:
             print("OOPS!! Connection Error. Make sure you are connected to Internet. Technical Details given below.\n")
             print(str(e))
-            return        
+            return
 
         except requests.Timeout as e:
             print("OOPS!! Timeout Error")
             print(str(e))
-            return        
+            return
 
         except requests.RequestException as e:
             print("OOPS!! General Error")
             print(str(e))
-            return        
+            return
 
         except KeyboardInterrupt:
             print("Someone closed the program")
-            return        
+            return
 
         r_switches = response.json()
         return r_switches
+
 
 class ExternalController(Controller):
     discovery_path = 'discovery'
@@ -257,13 +341,23 @@ class ExternalController(Controller):
     def discover_subrede(self, ip_addr, mask):
         network = IPNetwork('/'.join([ip_addr, mask]))
         generator = network.iter_hosts()
+        session = sessions.FuturesSession()
 
-        for ip in list(generator): 
-            print(ip)
+        futures = [
+            session.get("http://{}:{}/{}/{}".format(self.endpoint,
+                                                    self.wsgi_port,
+                                                    self.discovery_path,
+                                                    ip))
+            for ip in list(generator)
+        ]
 
+        return
 
-    def get_switches(self):
-        url = "http://{}:{}/{}".format(self.endpoint, self.wsgi_port, self.switches_path)
+    def get_datapath_id(self, ip):
+        url = "http://{}:{}/{}/{}".format(self.endpoint,
+                                          self.wsgi_port,
+                                          self.ip2dp_path,
+                                          ip)
 
         try:
             response = requests.get(url)
@@ -271,21 +365,50 @@ class ExternalController(Controller):
         except requests.ConnectionError as e:
             print("OOPS!! Connection Error. Make sure you are connected to Internet. Technical Details given below.\n")
             print(str(e))
-            return        
+            return
 
         except requests.Timeout as e:
             print("OOPS!! Timeout Error")
             print(str(e))
-            return        
+            return
 
         except requests.RequestException as e:
             print("OOPS!! General Error")
             print(str(e))
-            return        
+            return
 
         except KeyboardInterrupt:
             print("Someone closed the program")
-            return        
+            return
+
+        switch_data = response.json()
+        return switch_data
+
+    def get_switches(self):
+        url = "http://{}:{}/{}".format(self.endpoint,
+                                       self.wsgi_port, self.switches_path)
+
+        try:
+            response = requests.get(url)
+            response.raise_for_status()
+        except requests.ConnectionError as e:
+            print("OOPS!! Connection Error. Make sure you are connected to Internet. Technical Details given below.\n")
+            print(str(e))
+            return
+
+        except requests.Timeout as e:
+            print("OOPS!! Timeout Error")
+            print(str(e))
+            return
+
+        except requests.RequestException as e:
+            print("OOPS!! General Error")
+            print(str(e))
+            return
+
+        except KeyboardInterrupt:
+            print("Someone closed the program")
+            return
 
         r_switches = response.json()
         return r_switches
@@ -303,21 +426,25 @@ class EdgeController(Controller):
         self.wsgi_port = kwargs.get('wsgi_port')
 
     def add_flow(self, switch, flow):
-        url = "http://{}:{}/{}".format(self.endpoint, self.wsgi_port, self.add_flow_path)
+        url = "http://{}:{}/{}".format(self.endpoint,
+                                       self.wsgi_port, self.add_flow_path)
         return requests.post(url, json=flow)
-        
+
     def del_flow(self, flow):
-        url = "http://{}:{}/{}".format(self.endpoint, self.wsgi_port, self.del_flow_path)
+        url = "http://{}:{}/{}".format(self.endpoint,
+                                       self.wsgi_port, self.del_flow_path)
         return requests.post(url, json=flow)
 
     def mod_flow(self, flow):
-        url = "http://{}:{}/{}".format(self.endpoint, self.wsgi_port, self.mod_flow_path)
+        url = "http://{}:{}/{}".format(self.endpoint,
+                                       self.wsgi_port, self.mod_flow_path)
         return requests.post(url, json=flow)
 
     def get_switches(self):
-        url = "http://{}:{}/{}".format(self.endpoint, self.wsgi_port, self.switches_path)
+        url = "http://{}:{}/{}".format(self.endpoint,
+                                       self.wsgi_port, self.switches_path)
 
-        try: 
+        try:
             response = requests.get(url)
             response.raise_for_status()
         except requests.ConnectionError as e:
@@ -328,16 +455,16 @@ class EdgeController(Controller):
         except requests.Timeout as e:
             print("OOPS!! Timeout Error")
             print(str(e))
-            return []     
+            return []
 
         except requests.RequestException as e:
             print("OOPS!! General Error")
             print(str(e))
-            return []   
+            return []
 
         except KeyboardInterrupt:
             print("Someone closed the program")
-            return []     
+            return []
 
         r_switches = response.json()
         return r_switches
@@ -405,42 +532,46 @@ class GraphUndirectedWeighted(object):
 
         return shortest_path, distances[dest]
 
+
 class Cloud(object):
 
-    topology_controller = None
-    edge_controller = None
-    core_controller = None
-    external_controller = None
-
+    topology_controller: TopologyController = None
+    edge_controller: EdgeController = None
+    core_controller: CoreController = None
+    external_controller: ExternalController = None
 
     def set_topology_controller(self, controlller):
         self.topology_controller = controlller
-    
+
     def set_edge_controller(self, controller):
         self.edge_controller = controller
 
     def set_core_controller(self, controller):
         self.core_controller = controller
-  
+
     def set_external_controller(self, controller):
-        self.core_controller = controller
+        self.external_controller = controller
 
     def get_switches(self):
         all_switches = self.topology_controller.get_switches()
-                
-        if(all_switches is None):
-            print("Some Error occur during topology discovery. Check controllers and network")
-            return 
 
-        r_core_switches = [switch.get('dpid') for switch in self.core_controller.get_switches()]
-        r_edge_switches = [switch.get('dpid') for switch in self.edge_controller.get_switches()]
-        
+        if(all_switches is None):
+            print(
+                "Some Error occur during topology discovery. Check controllers and network")
+            return
+
+        r_core_switches = [switch.get('dpid')
+                           for switch in self.core_controller.get_switches()]
+        r_edge_switches = [switch.get('dpid')
+                           for switch in self.edge_controller.get_switches()]
+
         if(r_core_switches is None or r_edge_switches is None):
-            print("Some Error occur during core and edge discovery. Check controllers and network")
-            return 
+            print(
+                "Some Error occur during core and edge discovery. Check controllers and network")
+            return
 
         switches = []
-        
+
         for switch in all_switches:
             sw = Switch(**switch)
             if sw.dpid in r_core_switches:
@@ -453,16 +584,20 @@ class Cloud(object):
             else:
                 sw.switch_type = 'default'
             switches.append(sw)
-        
+
         return switches
 
     def get_links(self):
         r_links = self.topology_controller.get_links()
 
         links = []
+
+        if r_links is None or len(r_links) < 0:
+            return links
+
         for link in r_links:
             links.append(Link(**link))
-        
+
         return links
 
     def get_virtual_machines(self):
@@ -477,6 +612,18 @@ class Cloud(object):
                     vm.add_tap(Tap(**port))
             vms.append(vm)
         return vms
+
+    def get_vm_ports(self, cloud):
+        config = loader.OpenStackConfig()
+        conn = openstack.connect(cloud=cloud)
+        ports = conn.network.ports()
+
+        taps = []
+        for port in ports:
+            if port['device_owner'].startswith('compute'):
+                taps.append(Tap(**port))
+
+        return taps
 
     def create_virtual_machine(self, name, cloud, image, flavor, network):
         config = loader.OpenStackConfig()
@@ -495,7 +642,7 @@ class Cloud(object):
         print("ssh -i root@{ip}".format(ip=server.access_ipv4))
 
         return VirtualMachine(**server)
-    
+
     def find_virtual_machine(self, *args, **kwargs):
         config = loader.OpenStackConfig()
         conn = openstack.connect(cloud=kwargs.get('cloud'))
@@ -505,11 +652,12 @@ class Cloud(object):
             return VirtualMachine(**server)
         return None
 
+
 class Orquestrator(object):
 
     def __init__(self):
-        self.cloud = None 
-        self.graph = None
+        self.cloud: Cloud = None
+        self.graph: GraphUndirectedWeighted = None
         self.chains = None
 
     def add_chain(self, chain):
@@ -520,7 +668,7 @@ class Orquestrator(object):
 
     def get_graph(self):
         self.graph = GraphUndirectedWeighted(self.cloud.switches)
-            
+
         for link in self.cloud.links:
             self.graph.add_edge(link.port_src.dpid, link.port_dst.dpid, 1)
 
@@ -528,10 +676,45 @@ class Orquestrator(object):
         return self.graph.dijkstra(edge_source, edge_destination)
 
     def create_flow_classifier(self, *args, **kwargs):
-        pass
+
+        source_ip = kwargs.get('source_ip')
+
+        vm_taps = self.cloud.get_vm_ports(cloud='nuvem01')
+
+        target_tap: Tap = None
+        for tap in vm_taps:
+            if tap.ip == source_ip:
+                target_tap = tap
+                break
+
+        switch_data = None
+        if target_tap is None:
+            target_tap = self.cloud.external_controller.get_datapath_id(
+                source_ip)
+
+            if(switch_data is None):
+                self.cloud.external_controller.discover_subrede(
+                    source_ip, '255.255.255.0')
+
+            switch_data = self.cloud.external_controller.get_datapath_id(
+                source_ip)
+
+        if(switch_data is None and target_tap is None):
+            print("Source not found")
+            return
+
+        print(target_tap, switch_data)
+
+        # flow = Flow()
+        # flow.add_match('nw_src', kwargs.get('source_ip'))
+        # flow.add_match('nw_dst', kwargs.get('destination_ip'))
+        # flow.add_match('nw_proto', 1)
+        # flow.add_action('STRIP_VLAN')
+        # flow.add_action("SET_DL_DST", "90:0A:0B:0C:00:00")
+        # flow.add_action('OUTPUT', vnfi_dst.openflow_port)
 
     def create_virtual_function(self):
-        pass 
+        pass
 
     def find_virtual_function(self):
         pass
