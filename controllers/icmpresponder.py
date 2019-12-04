@@ -39,7 +39,6 @@ class IcmpResponder(app_manager.RyuApp):
         datapath.send_msg(mod)
 
     # It need a method to receive a packet in using of keyflow and add a flow to process
-
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
     def _packet_in_handler(self, ev):
         msg = ev.msg

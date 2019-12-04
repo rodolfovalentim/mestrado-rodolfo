@@ -65,7 +65,7 @@ class CoreController(app_manager.RyuApp):
                                           ofproto.OFPCML_NO_BUFFER)]
         self.logger.info("Switch %s has key %s" % (datapath.id, new_key))
         self.dpid_to_key[datapath.id] = new_key
-        self.add_flow(datapath, 0, match, actions)
+        self.add_flow(datapath, 100, match, actions)
 
         # install the table-miss flow entry.
         match = parser.OFPMatch()

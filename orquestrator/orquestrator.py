@@ -7,6 +7,7 @@ import openstack
 from openstack.config import loader
 import sys
 from prettyprinter import pprint
+from netaddr import IPNetwork
 
 # openstack.enable_logging(True, stream=sys.stdout)
 Edge = namedtuple('Edge', ['vertex', 'weight'])
@@ -242,6 +243,25 @@ class CoreController(Controller):
         r_switches = response.json()
         return r_switches
 
+class ExternalController(Controller):
+    discovery_path = 'discovery'
+    ip2dp_path = 'ip2dp'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.wsgi_port = kwargs.get('wsgi_port', '8080')
+
+    def get_keys(self):
+        pass
+
+    def discover_subrede(self, ip_addr, mask):
+        network = IPNetwork('/'.join([ip_addr, mask]))
+        generator = network.iter_hosts()
+
+        for ip in list(generator): 
+            print(ip)
+
+
     def get_switches(self):
         url = "http://{}:{}/{}".format(self.endpoint, self.wsgi_port, self.switches_path)
 
@@ -390,6 +410,8 @@ class Cloud(object):
     topology_controller = None
     edge_controller = None
     core_controller = None
+    external_controller = None
+
 
     def set_topology_controller(self, controlller):
         self.topology_controller = controlller
@@ -400,6 +422,9 @@ class Cloud(object):
     def set_core_controller(self, controller):
         self.core_controller = controller
   
+    def set_external_controller(self, controller):
+        self.core_controller = controller
+
     def get_switches(self):
         all_switches = self.topology_controller.get_switches()
                 
@@ -453,6 +478,33 @@ class Cloud(object):
             vms.append(vm)
         return vms
 
+    def create_virtual_machine(self, name, cloud, image, flavor, network):
+        config = loader.OpenStackConfig()
+        conn = openstack.connect(cloud=cloud)
+
+        print("Create Server:")
+        image = conn.compute.find_image(image)
+        flavor = conn.compute.find_flavor(flavor)
+        network = conn.network.find_network(network)
+
+        server = conn.compute.create_server(
+            name=name, image_id=image.id, flavor_id=flavor.id,
+            networks=[{"uuid": network.id}])
+
+        server = conn.compute.wait_for_server(server)
+        print("ssh -i root@{ip}".format(ip=server.access_ipv4))
+
+        return VirtualMachine(**server)
+    
+    def find_virtual_machine(self, *args, **kwargs):
+        config = loader.OpenStackConfig()
+        conn = openstack.connect(cloud=kwargs.get('cloud'))
+        server = conn.network.find_server(kwargs.get('name'))
+
+        if server:
+            return VirtualMachine(**server)
+        return None
+
 class Orquestrator(object):
 
     def __init__(self):
@@ -474,3 +526,12 @@ class Orquestrator(object):
 
     def get_hop_path(self, edge_source, edge_destination):
         return self.graph.dijkstra(edge_source, edge_destination)
+
+    def create_flow_classifier(self, *args, **kwargs):
+        pass
+
+    def create_virtual_function(self):
+        pass 
+
+    def find_virtual_function(self):
+        pass
