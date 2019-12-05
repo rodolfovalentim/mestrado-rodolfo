@@ -44,12 +44,8 @@ class RestController(ControllerBase):
 
     @route('nodes', '/switches', methods=['GET'])
     def get_nodes(self, req, **kwargs):
-        return self._switches()
-
-    def _switches(self):
-        dpid = None
-        switches = get_switch(self.edge_app, dpid)
-        body = [{'dpid': hex(switch.dp.id)[2:].zfill(
-            16), 'ip': switch.dp.socket.getpeername()[0]} for switch in switches]
-        print(body)
+        switches = get_switch(self.edge_app, None)
+        body = [{'dpid': hex(switch.dp.id)[2:].zfill(16), 
+                 'ip': switch.dp.socket.getpeername()[0]
+                 } for switch in switches]
         return Response(content_type='application/json', json=body)

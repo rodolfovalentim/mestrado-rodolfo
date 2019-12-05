@@ -1,15 +1,21 @@
 import json
+import logging
 import queue
-import requests
+import sys
 from collections import namedtuple
 from functools import reduce
+
+import daiquiri
 import openstack
-from openstack.config import loader
-import sys
-from prettyprinter import pprint
+import requests
 from netaddr import IPNetwork
+from openstack.config import loader
+from prettyprinter import pprint
 from requests_futures import sessions
 
+daiquiri.setup(level=logging.INFO)
+
+logger = daiquiri.getLogger(__name__)
 
 # openstack.enable_logging(True, stream=sys.stdout)
 Edge = namedtuple('Edge', ['vertex', 'weight'])
@@ -103,7 +109,6 @@ class Link(object):
 
 class Switch(object):
     def __init__(self, *args, **kwargs):
-        # self.controller = kwargs.get('controller', None)
         self.dpid = kwargs.get('dpid', None)
         self.ports = [Port(**port) for port in kwargs.get('ports')]
         self.switch_type = kwargs.get('switch_type', 'default')
@@ -126,65 +131,82 @@ class Switch(object):
     def set_ports(self, ports):
         self.ports = ports
 
-    def set_controller(self, controller):
-        self.controller = controller
+    def has_port(self, name):
+        for port in self.ports:
+            if port.name == name:
+                return True
+        return False
+
+    def get_output_port_no(self):
+        if self.switch_type == 'external':
+            f = lambda x, switch: switch.name == '{}-to-core'.format(switch.dpid[-4:]) and switch or x
+        else:
+            f = lambda x, switch: switch.name == 'int-br-ex' and switch or x 
+        port = reduce(f, self.ports)
+        
+        assert port is not None        
+        return port.port_no
 
 
 class Flow(object):
+    def __init__(self, *args, **kwargs):
+        self.switch: Switch = kwargs.get('switch', None)
+        self.match = {}
+        self.actions = []
 
-    match = {}
-    actions = []
+    def __repr__(self):
+        return 'Switch {}'.format(self.__dict__)
 
     def get_flow(self):
         return {'match': self.match, "actions": self.actions}
 
     def to_dict(self):
         return {
+            "dpid": self.switch.dpid,
             "table": 0,
-            "match": json.loads(self.match),
-            "actions": json.loads(self.actions)
+            "match": self.match,
+            "actions": self.actions
         }
 
     def add_match(self, match_type, *argv):
         if match_type == 'in_port':
             self.match['in_port'] = argv[0]
-        elif self.match_type == 'dl_src':
+        elif match_type == 'dl_src':
             self.match['dl_src'] = argv[0]
-        elif self.match_type == 'dl_dst':
+        elif match_type == 'dl_dst':
             self.match['dl_dst'] = argv[0]
-        elif self.match_type == 'dl_vlan':
+        elif match_type == 'dl_vlan':
             self.match['dl_vlan'] = argv[0]
-        elif self.match_type == 'dl_vlan_pcp':
+        elif match_type == 'dl_vlan_pcp':
             self.match['dl_vlan_pcp'] = argv[0]
             self.match['dl_vlan'] = argv[1]
-        elif self.match_type == 'dl_type':
+        elif match_type == 'dl_type':
             self.match['dl_type'] = argv[0]
-        elif self.match_type == 'nw_tos':
+        elif match_type == 'nw_tos':
             self.match['nw_tos'] = argv[0]
-        elif self.match_type == 'nw_proto':
+        elif match_type == 'nw_proto':
             self.match['nw_proto'] = argv[0]
             self.match['dl_type'] = 2048
-        elif self.match_type == 'nw_src':
+        elif match_type == 'nw_src':
             self.match['nw_src'] = argv[0]
             self.match['dl_type'] = 2048
-        elif self.match_type == 'nw_dst':
+        elif match_type == 'nw_dst':
             self.match['nw_dst'] = argv[0]
             self.match['dl_type'] = 2048
-        elif self.match_type == 'tp_src':
+        elif match_type == 'tp_src':
             self.match['tp_src'] = argv[0]
             self.match['dl_type'] = 2048
-        elif self.match_type == 'tp_dst':
+        elif match_type == 'tp_dst':
             self.match['nw_proto'] = argv[0]
             self.match['tp_dst'] = argv[1]
             self.match['dl_type'] = 2048
-        elif self.match_type == 'udp_dst':
+        elif match_type == 'udp_dst':
             self.match['udp_dst'] = argv[0]
             self.match['ip_proto'] = 17
             self.match['eth_type'] = 2048
         return self.match
 
     def add_action(self, action_type, *argv):
-        actions = json.loads(self.actions)
         if action_type == 'OUTPUT':
             self.actions.append({'type': 'OUTPUT', 'port': argv[0]})
         elif action_type == 'SET_VLAN_VID':
@@ -214,6 +236,12 @@ class Flow(object):
         return self.actions
 
 
+class FlowClassifier(object):
+    def __init__(self, *args, **kwargs):
+        self.switch: Switch = kwargs.get('switch', None)
+        self.flow: Flow = kwargs.get('flow', {})
+
+
 class Controller(object):
     def __init__(self, *args, **kwargs):
         self.endpoint = kwargs.get('endpoint', '127.0.0.1')
@@ -235,24 +263,9 @@ class TopologyController(Controller):
         try:
             response = requests.get(url)
             response.raise_for_status()
-
-        except requests.ConnectionError as e:
-            print("OOPS!! Connection Error. Make sure you are connected to Internet. Technical Details given below.\n")
-            print(str(e))
-            return
-
-        except requests.Timeout as e:
-            print("OOPS!! Timeout Error")
-            print(str(e))
-            return
-
-        except requests.RequestException as e:
-            print("OOPS!! General Error")
-            print(str(e))
-            return
-
-        except KeyboardInterrupt:
-            print("Someone closed the program")
+        except Exception as e:
+            logger.error("Connection Error. Technical Details given below.")
+            logger.error(str(e))
             return
 
         r_switches = response.json()
@@ -265,21 +278,9 @@ class TopologyController(Controller):
         try:
             response = requests.get(url)
             response.raise_for_status()
-        except requests.ConnectionError as e:
-            print("OOPS!! Connection Error. Make sure you are connected to Internet. Technical Details given below.\n")
-            print(str(e))
-            return
-        except requests.Timeout as e:
-            print("OOPS!! Timeout Error")
-            print(str(e))
-            return
-        except requests.RequestException as e:
-            print("OOPS!! General Error")
-            print(str(e))
-            return
-
-        except KeyboardInterrupt:
-            print("Someone closed the program")
+        except Exception as e:
+            logger.error("Connection Error. Technical Details given below.")
+            logger.error(str(e))
             return
 
         r_links = response.json()
@@ -304,23 +305,24 @@ class CoreController(Controller):
         try:
             response = requests.get(url)
             response.raise_for_status()
-        except requests.ConnectionError as e:
-            print("OOPS!! Connection Error. Make sure you are connected to Internet. Technical Details given below.\n")
-            print(str(e))
+        except Exception as e:
+            logger.error("Connection Error. Technical Details given below.")
+            logger.error(str(e))
             return
 
-        except requests.Timeout as e:
-            print("OOPS!! Timeout Error")
-            print(str(e))
-            return
+        r_switches = response.json()
+        return r_switches
 
-        except requests.RequestException as e:
-            print("OOPS!! General Error")
-            print(str(e))
-            return
+    def get_switches(self):
+        url = "http://{}:{}/{}".format(self.endpoint,
+                                       self.wsgi_port, self.switches_path)
 
-        except KeyboardInterrupt:
-            print("Someone closed the program")
+        try:
+            response = requests.get(url)
+            response.raise_for_status()
+        except Exception as e:
+            logger.error("Connection Error. Technical Details given below.")
+            logger.error(str(e))
             return
 
         r_switches = response.json()
@@ -330,6 +332,7 @@ class CoreController(Controller):
 class ExternalController(Controller):
     discovery_path = 'discovery'
     ip2dp_path = 'ip2dp'
+    switches_path = 'switches'
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -362,23 +365,9 @@ class ExternalController(Controller):
         try:
             response = requests.get(url)
             response.raise_for_status()
-        except requests.ConnectionError as e:
-            print("OOPS!! Connection Error. Make sure you are connected to Internet. Technical Details given below.\n")
-            print(str(e))
-            return
-
-        except requests.Timeout as e:
-            print("OOPS!! Timeout Error")
-            print(str(e))
-            return
-
-        except requests.RequestException as e:
-            print("OOPS!! General Error")
-            print(str(e))
-            return
-
-        except KeyboardInterrupt:
-            print("Someone closed the program")
+        except Exception as e:
+            logger.error("Connection Error. Technical Details given below.")
+            logger.error(str(e))
             return
 
         switch_data = response.json()
@@ -391,23 +380,9 @@ class ExternalController(Controller):
         try:
             response = requests.get(url)
             response.raise_for_status()
-        except requests.ConnectionError as e:
-            print("OOPS!! Connection Error. Make sure you are connected to Internet. Technical Details given below.\n")
-            print(str(e))
-            return
-
-        except requests.Timeout as e:
-            print("OOPS!! Timeout Error")
-            print(str(e))
-            return
-
-        except requests.RequestException as e:
-            print("OOPS!! General Error")
-            print(str(e))
-            return
-
-        except KeyboardInterrupt:
-            print("Someone closed the program")
+        except Exception as e:
+            logger.error("Connection Error. Technical Details given below.")
+            logger.error(str(e))
             return
 
         r_switches = response.json()
@@ -447,24 +422,10 @@ class EdgeController(Controller):
         try:
             response = requests.get(url)
             response.raise_for_status()
-        except requests.ConnectionError as e:
-            print("OOPS!! Connection Error. Make sure you are connected to Internet. Technical Details given below.\n")
-            print(str(e))
-            return []
-
-        except requests.Timeout as e:
-            print("OOPS!! Timeout Error")
-            print(str(e))
-            return []
-
-        except requests.RequestException as e:
-            print("OOPS!! General Error")
-            print(str(e))
-            return []
-
-        except KeyboardInterrupt:
-            print("Someone closed the program")
-            return []
+        except Exception as e:
+            logger.error("Connection Error. Technical Details given below.")
+            logger.error(str(e))
+            return
 
         r_switches = response.json()
         return r_switches
@@ -556,33 +517,38 @@ class Cloud(object):
         all_switches = self.topology_controller.get_switches()
 
         if(all_switches is None):
-            print(
+            logger.error(
                 "Some Error occur during topology discovery. Check controllers and network")
             return
 
-        r_core_switches = [switch.get('dpid')
-                           for switch in self.core_controller.get_switches()]
-        r_edge_switches = [switch.get('dpid')
-                           for switch in self.edge_controller.get_switches()]
+        d_switches = {}
 
-        if(r_core_switches is None or r_edge_switches is None):
-            print(
-                "Some Error occur during core and edge discovery. Check controllers and network")
-            return
+        d_switches['edge'] = {
+            switch['dpid']: switch for switch in self.edge_controller.get_switches()}
+        d_switches['core'] = {
+            switch['dpid']: switch for switch in self.core_controller.get_switches()}
+        d_switches['external'] = {
+            switch['dpid']: switch for switch in self.external_controller.get_switches()}
+
+        assert d_switches['edge'] is not None
+        assert d_switches['core'] is not None
+        assert d_switches['external'] is not None
 
         switches = []
 
         for switch in all_switches:
             sw = Switch(**switch)
-            if sw.dpid in r_core_switches:
+
+            if sw.dpid in d_switches['core'].keys():
                 sw.switch_type = 'core'
                 core_sw = self.core_controller.get_switch(sw.dpid)
                 if core_sw:
                     sw.key = core_sw.get('key')
-            elif sw.dpid in r_edge_switches:
+            elif sw.dpid in d_switches['edge'].keys():
                 sw.switch_type = 'edge'
-            else:
-                sw.switch_type = 'default'
+            elif sw.dpid in d_switches['external'].keys():
+                sw.switch_type = 'external'
+
             switches.append(sw)
 
         return switches
@@ -675,43 +641,68 @@ class Orquestrator(object):
     def get_hop_path(self, edge_source, edge_destination):
         return self.graph.dijkstra(edge_source, edge_destination)
 
-    def create_flow_classifier(self, *args, **kwargs):
+    def create_flow_classifier(self, cloud, flow_classifier):
+        source_ip = flow_classifier.get('source_ip')
 
-        source_ip = kwargs.get('source_ip')
+        flow: Flow = Flow()
+        flow.switch = self.find_source(cloud, source_ip)
+        assert flow.switch is not None
 
-        vm_taps = self.cloud.get_vm_ports(cloud='nuvem01')
+        flow.add_match('nw_src', flow_classifier.get('source_ip'))
+        flow.add_match('nw_dst', flow_classifier.get('destination_ip'))
+        flow.add_match('nw_proto', flow_classifier.get('protocol'))
+        flow.add_match('tp_src', flow_classifier.get('source_port'))
+        flow.add_match('tp_dst', flow_classifier.get('destination_port'))
+        
+        flow.add_action('STRIP_VLAN')
+        flow.add_action("SET_DL_DST", "90:0A:0B:0C:00:00")
+        flow.add_action('OUTPUT', flow.switch.get_output_port_no())
 
+        logger.info(flow.to_dict())
+
+
+    def find_source(self, cloud, source_ip):
+        vm_taps = self.cloud.get_vm_ports(cloud=cloud)
+
+        # Find tap if source is a VM
         target_tap: Tap = None
         for tap in vm_taps:
             if tap.ip == source_ip:
                 target_tap = tap
                 break
 
+        # Find switch if source is not a VM
         switch_data = None
         if target_tap is None:
-            target_tap = self.cloud.external_controller.get_datapath_id(
-                source_ip)
-
-            if(switch_data is None):
-                self.cloud.external_controller.discover_subrede(
-                    source_ip, '255.255.255.0')
-
             switch_data = self.cloud.external_controller.get_datapath_id(
                 source_ip)
 
-        if(switch_data is None and target_tap is None):
-            print("Source not found")
-            return
+            if(switch_data is None):
+                logger.warning("ip to path return fail, discovering network")
+                self.cloud.external_controller.discover_subrede(
+                    source_ip, '255.255.255.0')
+                switch_data = self.cloud.external_controller.get_datapath_id(
+                    source_ip)
 
-        print(target_tap, switch_data)
+        logger.info(switch_data)
+        logger.info(target_tap)
 
-        # flow = Flow()
-        # flow.add_match('nw_src', kwargs.get('source_ip'))
-        # flow.add_match('nw_dst', kwargs.get('destination_ip'))
-        # flow.add_match('nw_proto', 1)
-        # flow.add_action('STRIP_VLAN')
-        # flow.add_action("SET_DL_DST", "90:0A:0B:0C:00:00")
-        # flow.add_action('OUTPUT', vnfi_dst.openflow_port)
+        switches = self.cloud.get_switches()
+
+        assert switches is not None
+
+        target_switch = None
+        if target_tap is not None:
+            for switch in switches:
+                if switch.has_port(target_tap.name):
+                    target_switch = switch
+
+        if switch_data is not None:
+            for switch in switches:
+                if switch.dpid == switch_data['dpid']:
+                    target_switch = switch
+
+        return target_switch
 
     def create_virtual_function(self):
         pass

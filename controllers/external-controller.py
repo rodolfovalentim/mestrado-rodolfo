@@ -65,12 +65,12 @@ class ExternalController(app_manager.RyuApp):
         datapath = msg.datapath
         port = msg.match['in_port']
         pkt = packet.Packet(data=msg.data)
-        self.logger.info("packet-in %s" % (pkt,))
         pkt_ethernet = pkt.get_protocol(ethernet.ethernet)
         if not pkt_ethernet:
             return
         pkt_arp = pkt.get_protocol(arp.arp)
         if pkt_arp:
+            self.logger.info("packet-in %s" % (pkt,))
             self.logger.info('The IP {} is connected to switch {}'.format(
                 pkt_arp.src_ip, hex(datapath.id)[2:].zfill(16)))
             self.ip_to_dpid[pkt_arp.src_ip] = hex(datapath.id)[2:].zfill(16)
@@ -141,3 +141,11 @@ class RestController(ControllerBase):
             return Response(content_type='application/json', json=body, status=200)
 
         return Response(content_type='application/json', json={}, status=404)
+
+    @route('nodes', '/switches', methods=['GET'])
+    def get_nodes(self, req, **kwargs):
+        switches = get_switch(self.external_app, None)
+        body = [{'dpid': hex(switch.dp.id)[2:].zfill(16), 
+                 'ip': switch.dp.socket.getpeername()[0]
+                 } for switch in switches]
+        return Response(content_type='application/json', json=body)

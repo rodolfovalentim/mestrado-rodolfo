@@ -66,8 +66,8 @@ def myNetwork():
     net.addLink(s2, s4)
     net.addLink(s4, s5)
     net.addLink(s3, s5)
-    net.addLink(s6, s5)
-    net.addLink(s7, s5)
+    net.addLink(s6, s5, intfName1='0006-to-core')
+    net.addLink(s7, s5, intfName1='0007-to-core')
 
     info('*** Starting network\n')
     net.build()
@@ -81,8 +81,8 @@ def myNetwork():
     net.get('s3').start([c1, c2])
     net.get('s4').start([c1, c2])
     net.get('s5').start([c1, c2])
-    net.get('s6').start([c0, c2, c3])
-    net.get('s7').start([c0, c2, c3])
+    net.get('s6').start([c2, c3])
+    net.get('s7').start([c2, c3])
 
     info('*** Post configure switches and hosts\n')
 

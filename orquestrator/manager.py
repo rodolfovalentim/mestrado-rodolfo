@@ -20,20 +20,19 @@ if __name__ == "__main__":
     cloud.set_edge_controller(edge_ctrl)
     cloud.set_external_controller(ext_ctrl)
 
-    # pprint(cloud.get_switches())
-    # pprint(cloud.get_links())
-    # pprint(cloud.get_virtual_machines())
-    # pprint(cloud.get_vm_ports("nuvem01"))
     orq = Orquestrator()
     orq.cloud = cloud
 
-    flow_classifier = orq.create_flow_classifier(**{
-        'source_ip': '10.0.0.3',
-        'source_port': 80,
-        'destination_ip': '10.0.101.15',
-        'destination_port': 80,
-        'protocol': 'udp',
-    })
+    classifier = {
+                    'source_ip': '10.0.0.1',
+                    'source_port': 80,
+                    'destination_ip': '10.0.101.15',
+                    'destination_port': 80,
+                    'protocol': 'udp',
+                }
+
+    flow_classifier = orq.create_flow_classifier(cloud='nuvem02', 
+                                                 flow_classifier=classifier)
 
     # nat = orq.create_virtual_function(
     #     name='src', compute_host='compute01', vnf_type="nat", cloud='nuvem01')
