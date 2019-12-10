@@ -34,15 +34,15 @@ if __name__ == "__main__":
     flow_classifier = orq.create_flow_classifier(cloud='nuvem02', 
                                                  flow_classifier=classifier)
 
-    # nat = orq.create_virtual_function(
-    #     name='src', compute_host='compute01', vnf_type="nat", cloud='nuvem01')
+    nat = orq.create_virtual_function(
+        name='src', compute_host='compute01', vnf_type="nat", cloud='nuvem01')
 
-    # gw_sfc_n1 = orq.get_gateway(cloud='nuvem01')
+    gw_sfc_n1 = orq.get_gateway(cloud='nuvem01')
 
-    # gw_sfc_n2 = orq.get_gateway(cloud='nuvem02')
+    gw_sfc_n2 = orq.get_gateway(cloud='nuvem02')
 
-    # dpi = orq.create_virtual_function(
-    #     name='src', compute_host='controller', vnf_type="dpi", cloud='nuvem02')
+    dpi = orq.create_virtual_function(
+        name='src', compute_host='controller', vnf_type="dpi", cloud='nuvem02')
 
-    # orq.create_chain(flow_classifier=flow_classifier, service_chain=[nat, gw_sfc_n1,
-    #                         gw_sfc_n2, dpi], simetric=False)
+    orq.create_chain(flow_classifier=flow_classifier, service_chain=[nat, gw_sfc_n1,
+                            gw_sfc_n2, dpi], simetric=False)

@@ -645,7 +645,7 @@ class Orquestrator(object):
         source_ip = flow_classifier.get('source_ip')
 
         flow: Flow = Flow()
-        flow.switch = self.find_source(cloud, source_ip)
+        flow.switch = self.find_switch(cloud, source_ip)
         assert flow.switch is not None
 
         flow.add_match('nw_src', flow_classifier.get('source_ip'))
@@ -660,14 +660,13 @@ class Orquestrator(object):
 
         logger.info(flow.to_dict())
 
-
-    def find_source(self, cloud, source_ip):
+    def find_switch(self, cloud, ip):
         vm_taps = self.cloud.get_vm_ports(cloud=cloud)
 
         # Find tap if source is a VM
         target_tap: Tap = None
         for tap in vm_taps:
-            if tap.ip == source_ip:
+            if tap.ip == ip:
                 target_tap = tap
                 break
 
@@ -675,14 +674,14 @@ class Orquestrator(object):
         switch_data = None
         if target_tap is None:
             switch_data = self.cloud.external_controller.get_datapath_id(
-                source_ip)
+                ip)
 
             if(switch_data is None):
                 logger.warning("ip to path return fail, discovering network")
                 self.cloud.external_controller.discover_subrede(
-                    source_ip, '255.255.255.0')
+                    ip, '255.255.255.0')
                 switch_data = self.cloud.external_controller.get_datapath_id(
-                    source_ip)
+                    ip)
 
         logger.info(switch_data)
         logger.info(target_tap)
@@ -703,6 +702,50 @@ class Orquestrator(object):
                     target_switch = switch
 
         return target_switch
+
+    def make_hop(self, src_switch, dest_switch, last_hop_key=None):
+        path = self.get_hop_path(src_switch, dest_switch)
+
+        # Maybe, put this inside KeyflowAgent
+        ids = KeyFlowAgent.extract_keys_from_path(path)
+        ports = KeyFlowAgent.extract_output_ports_from_path(path)
+        hop_key = KeyFlowAgent.chinese_remainder(ids, ports)
+
+        src_flow: Flow = Flow()
+        src_flow.switch = src_switch
+
+        if last_hop_key:
+            src_flow.add_match('dl_src', last_hop_key)
+        
+        #Tenho que adicionar algo aqui. A porta da VM
+        src_flow.add_match('in_port', src_switch.in_port()) 
+        
+        src_flow.add_action('mod_dl_src', hop_key)
+
+        # Case src and destination hop are connected to same edge or external switch
+        if src_switch.dpid == dest_switch.dpid:
+            src_flow.add_action('OUTPUT', dest_switch.get_vm_port_no())
+            return src_flow, None, hop_key
+
+        # Otherwise, continue and process the destination
+        src_flow.add_action('OUTPUT', src_flow.switch.get_output_port_no())
+        
+        logger.info(src_flow.to_dict())
+
+        dest_flow: Flow = Flow()
+        dest_flow.switch = dest_switch
+
+        dest_flow.add_match('dl_src', hop_key)
+        dest_flow.add_match('in_port', dest_flow.get_output_port_no())
+        dest_flow.add_action('OUTPUT', dest_flow.switch.get_output_port_no())
+
+        logger.info(dest_flow.to_dict()) 
+
+        return src_flow, dest_flow, hop_key
+
+
+    def create_chain(self, flow_classifier, service_chain, simetric=False):
+        pass
 
     def create_virtual_function(self):
         pass
