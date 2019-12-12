@@ -206,8 +206,6 @@ class RestController(ControllerBase):
                 'key': self.core_app.dpid_to_key.get(switch.dp.id)}
                 return Response(content_type='application/json', json=body)
         return Response("Not found", 404)
-
-    
         
     def _switches(self):
         dpid = None
