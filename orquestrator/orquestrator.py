@@ -5,6 +5,7 @@ from collections import namedtuple
 from nfv import FowardingGraphDomain, FowardingGraphHop, VirtualNetworkFunction
 from switch import Flow, Link, Switch
 from pprint import pprint
+import queue
 
 daiquiri.setup(level=logging.INFO)
 logger = daiquiri.getLogger(__name__)
