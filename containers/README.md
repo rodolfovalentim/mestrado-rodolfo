@@ -1,6 +1,7 @@
 # docker build . -t rodolfo/centos-source-openvswitch
 
-# docker run -d --net=host --name=rodolfo-openvswitch -v /lib:/lib --privileged rodolfo/centos-source-openvswitch /bin/bash
+# docker run -t -d --net=host --name=rodolfo-openvswitch -v /lib:/lib --privileged rodolfo/centos-source-openvswitch /bin/bash
+
 # docker exec -u 0 rodolfo-openvswitch ovs-ctl start
 
 # docker build . -t rodolfo/ubuntu-source-ryu
