@@ -3,12 +3,12 @@ FROM centos:centos7
 # Install git
 RUN yum update \        
     yum install -y git \
-    yum install @'Development Tools' rpm-build yum-utils
+    yum install @'Development Tools' rpm-build yum-utils epel-release
 
 RUN git clone https://github.com/openvswitch/ovs.git
 
 WORKDIR /ovs
-RUN git checkout v2.11.0
+RUN git checkout v2.12.0
 RUN sed -e 's/@VERSION@/0.0.1/' rhel/openvswitch.spec.in > /tmp/ovs.spec
 RUN yum-builddep  -y /tmp/ovs.spec
 RUN rm /tmp/ovs.spec

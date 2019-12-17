@@ -1,53 +1,72 @@
 # Salto 1
 ##192.168.0.92
-ovs-ofctl add-flow br-int "in_port=qvoxxxx, ip, nw_src=10.0.0.1, nw_dst=10.0.0.2, \
-    tp_src=8012, tp_dst=8013, actions=dl_src=90:00:00:00:00:01, output=2"
+docker exec -u 0 rodolfo-openvswitch ovs-ofctl add-flow br-int "table=0, priority=100, in_port=3, ip, nw_src=10.0.0.1, nw_dst=10.83.1.7, actions=mod_dl_dst=90:00:00:00:00:01, output=2"
+docker exec -u 0 rodolfo-openvswitch ovs-ofctl add-flow br-ex "table=0, priority=100, in_port=3, dl_dst=90:00:00:00:00:01, actions=output=1"
 
-ovs-ofctl add-flow br-ex "in_port=int-br-ex, dl_src=90:00:00:00:00:01, actions=output=2"
 
 ##192.168.0.40
-ovs-ofctl add-flow br-ex "dl_src=90:00:00:00:00:01, actions=output=2"
-ovs-ofctl add-flow br-int "in_port=br-ex, dl_src=90:00:00:00:00:01, actions=output=1"
+docker exec -u 0 openvswitch_vswitchd ovs-vsctl show br-ex
+docker exec -u 0 openvswitch_vswitchd ovs-ofctl add-flow br-ex "table=0, priority=100, in_port=1, dl_dst=90:00:00:00:00:01, actions=output=2"
+docker exec -u 0 openvswitch_vswitchd ovs-ofctl add-flow br-int "table=0, priority=100, in_port=1, dl_dst=90:00:00:00:00:01, actions=output=15"
 
 # Salto 2
 ##192.168.0.40
-ovs-ofctl add-flow br-int "in_port=vm1, dl_src=90:00:00:00:00:01, \
-    actions=dl_src=90:00:00:00:00:02, output=int-br-ex"
+docker exec -u 0 openvswitch_vswitchd ovs-ofctl add-flow br-int "table=0, priority=100, in_port=15,  priority=100, dl_dst=90:00:00:00:00:01, actions=mod_dl_dst=90:00:00:00:00:02, output=1"
+docker exec -u 0 openvswitch_vswitchd ovs-ofctl add-flow br-ex "table=0, priority=100, in_port=2, dl_dst=90:00:00:00:00:02, actions=output=1"
 
 ##192.168.0.92
-ovs-ofctl add-flow br-ex "in_port=ex-br-int, dl_src=90:00:00:00:00:02, actions=output=em2"
+docker exec -u 0 rodolfo-openvswitch ovs-ofctl add-flow br-ex "in_port=p1p1, dl_dst=90:00:00:00:00:02, actions=output=p1p2" --names
 
 ##192.168.0.41
-ovs-ofctl add-flow br-ex "dl_src=90:00:00:00:00:02, actions=output=2"
-ovs-ofctl add-flow br-int "in_port=br-ex, dl_src=90:00:00:00:00:02, actions=output=1"
+docker exec -u 0 openvswitch_vswitchd  ovs-ofctl add-flow br-ex "table=0, priority=100, in_port=em2, dl_dst=90:00:00:00:00:02, actions=output=phy-br-ex" --names
+docker exec -u 0 openvswitch_vswitchd  ovs-ofctl add-flow br-int "table=0, priority=100, in_port=int-br-ex, dl_dst=90:00:00:00:00:02, actions=output=qvobc09b88d-23" --names
 
 # Salto 3
 ##192.168.0.41
-ovs-ofctl add-flow br-int "in_port=vm2, dl_src=90:00:00:00:00:02, \
-    actions=dl_src=90:00:00:00:00:03, output=vm3"
+docker exec -u 0 openvswitch_vswitchd ovs-ofctl add-flow br-int "table=0, priority=100, in_port=qvobc09b88d-23, dl_dst=90:00:00:00:00:02, actions=mod_dl_dst=90:00:00:00:00:03, output=qvob5d1acfa-e7" --names
 
 # Salto 4
 ##192.168.0.41
-ovs-ofctl add-flow br-int "in_port=vm3, dl_src=90:00:00:00:00:03, \
-    actions=dl_src=90:00:00:00:00:04, output=int-br-ex"
+docker exec -u 0 openvswitch_vswitchd ovs-ofctl add-flow br-int "table=0, priority=100, in_port=qvob5d1acfa-e7, dl_dst=90:00:00:00:00:03, actions=mod_dl_dst=90:00:00:00:00:04, output=int-br-ex" --names
 
-ovs-ofctl add-flow br-ex "dl_src=90:00:00:00:00:04, actions=output=em2"
+# Salto 4
+##192.168.0.41
+docker exec -u 0 openvswitch_vswitchd ovs-ofctl add-flow br-int "table=0, priority=100, in_port=qvob5d1acfa-e7, dl_dst=90:00:00:00:00:03, actions=mod_dl_dst=90:00:00:00:00:04, output=int-br-ex" --names
+docker exec -u 0 openvswitch_vswitchd ovs-ofctl add-flow br-ex "table=0, priority=100, in_port=phy-br-ex, dl_dst=90:00:00:00:00:04, actions=output=em2" --names
 
 ##192.168.0.92
-ovs-ofctl add-flow br-ex "dl_src=90:00:00:00:00:04, actions=output=ex-br-sfc"
-ovs-ofctl add-flow br-sfc "dl_src=90:00:00:00:00:04, actions=output=tun0"
-
+docker exec -u 0 rodolfo-openvswitch ovs-ofctl add-flow br-ex "table=0, priority=100,  in_port=p1p2, dl_dst=90:00:00:00:00:04, actions=output=ex-br-sfc" --names
+docker exec -u 0 rodolfo-openvswitch ovs-ofctl add-flow br-sfc "table=0, priority=100, in_port=sfc-br-ex dl_dst=90:00:00:00:00:04, actions=output=tun0" --names
 
 ##192.168.0.78
-ovs-ofctl add-flow br-sfc "dl_src=90:00:00:00:00:04, actions=output=sfc-br-ex"
-ovs-ofctl add-flow br-ex "dl_src=90:00:00:00:00:04, actions=output=3"
+docker exec -u 0 rodolfo-openvswitch ovs-ofctl add-flow br-sfc "table=0, priority=100, in_port=tun0 dl_dst=90:00:00:00:00:04, actions=output=sfc-br-ex" --names
+docker exec -u 0 rodolfo-openvswitch ovs-ofctl add-flow br-ex "table=0, priority=100, in_port=ex-br-sfc, dl_dst=90:00:00:00:00:04, actions=output=p4p1" --names
+ip route add 10.81.0.0/16 dev p4p4 via 10.82.255.254
+iptables -D INPUT -j REJECT --reject-with icmp-host-prohibited
 
-##192.168.0.50
-ovs-ofctl add-flow br-int "in_port=int-br-ex, dl_src=90:00:00:00:00:04, \
-    actions=output=vm4"
+## 192.168.0.92
+ip route add 10.82.0.0/16 dev p1p4 via 10.81.255.254
+iptables -D INPUT -j REJECT --reject-with icmp-host-prohibited
 
-# Salto 5
-ovs-ofctl add-flow br-int "in_port=vm4, dl_src=90:00:00:00:00:04, \
-    actions=output=vm4"
+## 192.168.0.50
+docker exec -u 0 openvswitch_vswitchd ovs-ofctl add-flow br-ex "table=0, priority=100, in_port=em2, dl_dst=90:00:00:00:00:04, actions=output=phy-br-ex"
+docker exec -u 0 openvswitch_vswitchd ovs-ofctl add-flow br-int "table=0, priority=100, in_port=int-br-ex, dl_dst=90:00:00:00:00:04, actions=output=qvoc6d5fefc-a5"
 
-# Fazer ARP Responder em todos os nós!
+## Salto 5
+docker exec -u 0 openvswitch_vswitchd ovs-ofctl add-flow br-int "in_port=qvoc6d5fefc-a5, dl_dst=90:00:00:00:00:04, actions=mod_dl_dst=fa:16:3e:f8:21:5d, output=qvoa3fe65dd-51"
+# Eu preciso retornar o pacote as condições originais
+
+## Fazer ARP Responder em todos os nós!
+
+# A volta!
+## 192.168.0.50
+docker exec -u 0 openvswitch_vswitchd ovs-ofctl add-flow br-int "table=0, priority=100, in_port=qvoa3fe65dd-51, ip, nw_src=10.83.1.7, nw_dst=10.0.0.1, actions=mod_dl_dst=90:00:00:00:00:05, output=int-br-ex" --names
+docker exec -u 0 openvswitch_vswitchd ovs-ofctl add-flow br-ex "table=0, priority=100, in_port=phy-br-ex, dl_dst=90:00:00:00:00:05, actions=output=em2"  --names
+##192.168.0.78
+docker exec -u 0 rodolfo-openvswitch ovs-ofctl add-flow br-ex "table=0, priority=100, in_port=p4p1, dl_dst=90:00:00:00:00:05, actions=output=ex-br-sfc" --names
+docker exec -u 0 rodolfo-openvswitch ovs-ofctl add-flow br-sfc "table=0, priority=100, in_port=sfc-br-ex, dl_dst=90:00:00:00:00:05, actions=output=tun0" --names
+
+##192.168.0.92
+docker exec -u 0 rodolfo-openvswitch ovs-ofctl add-flow br-sfc "table=0, priority=100, in_port=tun0, dl_dst=90:00:00:00:00:05, actions=output=sfc-br-ex" --names
+docker exec -u 0 rodolfo-openvswitch ovs-ofctl add-flow br-ex "table=0, priority=100, in_port=ex-br-sfc, dl_dst=90:00:00:00:00:05, actions=output=ex-br-int" --names
+docker exec -u 0 rodolfo-openvswitch ovs-ofctl add-flow br-int "table=0, priority=100, in_port=int-br-ex, dl_dst=90:00:00:00:00:05, actions=mod_dl_dst=22:4a:ba:99:2f:07, output=br-int-p1" --names

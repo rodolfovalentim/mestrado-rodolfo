@@ -23,9 +23,9 @@ def get_hop_route(graph, edge_source, edge_destination):
 
 
 def create_virtual_function(cloud, name, availability_zone, vnf_type, may_exist=False):
-    image = "cirros"
-    flavor = "m1.tiny"
-    network = "demo-net"
+    image = "ubuntu"
+    flavor = "m1.small"
+    network = "physnet1"
     vnf = cloud.create_virtual_machine(
         name, image, flavor, network, availability_zone=availability_zone, may_exist=may_exist)
     vnf.__class__ = VirtualNetworkFunction

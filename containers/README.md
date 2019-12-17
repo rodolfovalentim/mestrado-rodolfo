@@ -6,4 +6,4 @@
 
 # docker build . -t rodolfo/ubuntu-source-ryu
 
-# docker run -itd --name=ryu -p 6653:6653 -p 8080:8080 rodolfo/ubuntu-source-ryu ryu-manager ryu.app.ofctl_rest ryu.app.simple_switch
+# docker run -t -d --name=ryu -p 6634:6634 -p 8087:8087 rodolfo/ubuntu-source-ryu ryu-manager ryu.app.rest_topology --observe-links --ofp-tcp-listen-port 6634 --wsapi-host 0.0.0.0 --wsapi-port 8087
