@@ -35,7 +35,7 @@ docker exec -u 0 rodolfo-openvswitch ovs-vsctl add-port br-ex $NUVEM1_INT
 docker exec -u 0 rodolfo-openvswitch ovs-vsctl add-port br-ex $NUVEM2_INT 
 
 docker exec -u 0 rodolfo-openvswitch ovs-vsctl add-br br-sfc
-docker exec -u 0 rodolfo-openvswitch ovs-vsctl add-port br-sfc tun0 -- set interface tun0 type=vxlan options:remote_ip=$REMOTE_IP options:key=123
+docker exec -u 0 rodolfo-openvswitch ovs-vsctl add-port br-sfc tun0 -- set interface tun0 type=vxlan options:remote_ip=$REMOTE_IP options:key=123 options:df_default=false
 
 # Conexão entre a br-int e br-ex
 docker exec -u 0 rodolfo-openvswitch ovs-vsctl add-port br-int int-br-ex
