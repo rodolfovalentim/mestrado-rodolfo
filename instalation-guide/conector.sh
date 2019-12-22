@@ -6,6 +6,8 @@ systemctl enable docker
 systemctl start docker
 systemctl status docker
 
+# DIsable selinux
+
 # 192.168.0.92
 PROVIDER_INT=em2
 NUVEM1_INT=p1p1
