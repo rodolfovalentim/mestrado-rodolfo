@@ -11,7 +11,6 @@ Interval;Jitter(ms);Test
 0.0-100.4;0.011;Apenas túnel
 0.0-110.5;0.017;Apenas túnel
 0.0-120.5;0.013;Apenas túnel
-0.0-130.6;62.513;Apenas túnel
 0.0-140.6;0.010;Apenas túnel
 0.0-150.7;0.008;Apenas túnel
 0.0-160.8;0.008;Apenas túnel
@@ -45,7 +44,6 @@ Interval;Jitter(ms);Test
 0.0-173.2;0.079;Fim-a-fim
 0.0-185.7;0.079;Fim-a-fim
 0.0-198.3;0.058;Fim-a-fim
-0.0-210.8;62.572;Fim-a-fim
 0.0-223.4;0.078;Fim-a-fim
 0.0-236.0;0.059;Fim-a-fim
 0.0-248.5;0.066;Fim-a-fim
