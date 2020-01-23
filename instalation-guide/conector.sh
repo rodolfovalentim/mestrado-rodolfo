@@ -1,5 +1,4 @@
-# 192.168.0.78
-
+# 192.168.0.89
 curl -sSL https://get.docker.io | bash
 usermod -aG wheel stack
 systemctl enable docker
@@ -14,7 +13,7 @@ NUVEM2_INT=p1p2
 INTERNAL_INT=p1p4
 REMOTE_IP=10.82.0.1
 
-# 192.168.0.78
+# 192.168.0.89
 IP=192.168.0.50
 PROVIDER_INT=em2
 NUVEM1_INT=p4p1
@@ -59,7 +58,6 @@ docker exec -u 0 rodolfo-openvswitch ovs-vsctl add-port br-ex ex-br-sfc
 docker exec -u 0 rodolfo-openvswitch ovs-vsctl set interface ex-br-sfc type=patch
 docker exec -u 0 rodolfo-openvswitch ovs-vsctl set interface ex-br-sfc options=peer=sfc-br-ex
 
-
 docker exec -u 0 rodolfo-openvswitch ovs-vsctl set-controller br-int tcp:127.0.0.1:6633 tcp:$IP:6634
 docker exec -u 0 rodolfo-openvswitch ovs-vsctl set-controller br-ex tcp:127.0.0.1:6633 tcp:$IP:6634
 docker exec -u 0 rodolfo-openvswitch ovs-vsctl set-controller br-sfc tcp:127.0.0.1:6633 tcp:$IP:6634
@@ -77,7 +75,6 @@ sudo ip netns exec src ifconfig veth1 10.80.2.1/16 up
 sudo ip netns exec src ip route add 10.83.0.0/16 dev veth1
 sudo ip netns exec src arp -s 10.83.1.7 90:00:00:00:00:01
 sudo ifconfig br-int-p1 up
-
 
 docker exec -u 0 rodolfo-openvswitch ovs-vsctl add-port br-int br-int-p1
 docker exec -u 0 rodolfo-openvswitch ovs-vsctl set-controller br-int tcp:127.0.0.1:6633 \

@@ -1,0 +1,63 @@
+# - hosts: conection_nodes
+# # Create a bridge named br-int
+#   tasks:
+#     - name: "Create a bridge br-int"
+#       openvswitch_bridge:
+#         bridge: br-test
+#         state: present
+#     # Creates port eth2 on bridge br-ex
+#       # openvswitch_port:
+#       #   bridge: br-int
+#       #   port:  
+#       #   state: present
+#     - name: "Creates port p1p3 on bridge br-int"
+#       openvswitch_port:
+#         bridge: br-test
+#         port: p1p3
+#         state: present
+#         # set: Interface eth6
+
+# - hosts: sdn_controllers
+#   tasks:
+#     - name: Create a Ryu container
+#       docker_container:
+#         name: ryu
+#         image: rodolfo/ubuntu-source-ryu
+#         ports:
+#         - "6634:6634"
+#         - "8087:8087"
+#         command: ryu-manager ryu.app.rest_topology --observe-links --ofp-tcp-listen-port 6634 --wsapi-host 0.0.0.0 --wsapi-port 8087
+
+# - hosts: sdn_controllers
+#   tasks:
+#     - name: add container to inventory
+#       add_host:
+#         name: openvswitch_vswitchd
+#         ansible_connection: docker
+#         ansible_user: root
+#       changed_when: false
+
+#     - name: run command in container
+#       delegate_to: openvswitch_vswitchd
+#       raw: echo "test" > test.txt
+
+- hosts: sdn_controllers
+  become: true
+  tasks:
+    - name: create jenkins container
+      docker_container:
+        name: my_jenkins
+        image: jenkins
+
+    - name: add container to inventory
+      add_host:
+        name: my_jenkins
+        ansible_connection: docker
+        ansible_user: jenkins
+      changed_when: false
+
+    - name: create directory for ssh keys
+      delegate_to: my_jenkins
+      file:
+        path: "/var/jenkins_home/.ssh/jupiter"
+        state: directory

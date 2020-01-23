@@ -39,15 +39,6 @@ if __name__ == "__main__":
     cloud2.set_external_controller(ext_ctrl_n2)
     cloud2.set_gateway_controller(gw_ctrl_n2)
     
-    # classifier = {
-    #     'source_ip': '10.0.0.1',
-    #     'source_port': 80,
-    #     'source_cloud': cloud1,
-    #     'destination_ip': '10.0.101.15',
-    #     'destination_port': 80,
-    #     'protocol': 'udp',
-    #     'destination_cloud': cloud2
-    # }
 
     dpi = orq.create_virtual_function(cloud=cloud1,
                                       name='dpi', 
@@ -81,5 +72,13 @@ if __name__ == "__main__":
                                       may_exist=True)
     
     
-    # orq.create_chain(flow_classifier=classifier, 
-    #                  service_chain=[dpi, edge_fw1])
+    # orq.create_chain(classifier={
+    #     'source_ip': '10.0.0.1',
+    #     'source_port': 80,
+    #     'source_cloud': cloud1,
+    #     'destination_ip': '10.0.101.15',
+    #     'destination_port': 80,
+    #     'protocol': 'udp',
+    #     'destination_cloud': cloud2
+    # }, service_chain=[dpi, edge_fw1])
+

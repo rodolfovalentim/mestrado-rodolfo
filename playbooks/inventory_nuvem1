@@ -1,0 +1,22 @@
+[nodes]
+192.168.0.40 ansible_user=root ansible_become=yes
+192.168.0.41 ansible_user=root ansible_become=yes
+
+[conection_nodes]
+192.168.0.92 ansible_user=root ansible_become=yes
+
+[sdn_controllers]
+192.168.0.40 ansible_user=root ansible_become=yes
+
+[nodes:vars]
+container_name=openvswitch_vswitchd 
+edge_bridge_name=br-int 
+edge_ctrls_endpoints="tcp:127.0.0.1:6633 tcp:192.168.0.40:6634 tcp:192.168.0.40:6636"
+core_bridge_name=br-ex 
+core_ctrls_endpoints="tcp:127.0.0.1:6633 tcp:192.168.0.40:6634 tcp:192.168.0.40:6635"
+
+[sdn_controllers:vars]
+container_name=ryu
+tcp_port=6634:6634
+http_port=8087:8087 
+image_name=rodolfo/ubuntu-source-ryu

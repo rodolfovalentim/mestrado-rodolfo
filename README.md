@@ -11,20 +11,14 @@
 | ---------- | ------------ | -------- | -------- |
 | All in one | 192.168.0.50 | stack    | stack    |
 
-# KeyFlow Node
+# NFV Switch 1
 
 | Nó         | IP           | Username | Password |
 | ---------- | ------------ | -------- | -------- |
 | All in one | 192.168.0.92 | stack    | stack    |
 
-# SFC Gateway
+# NFV Switch 2
 
 | Nó         | IP           | Username | Password |
 | ---------- | ------------ | -------- | -------- |
-| All in one | 192.168.0.78 | stack    | stack    |
-
-# Microtik Keyflow
-
-| Nó         | IP           | Username | Password |
-| ---------- | ------------ | -------- | -------- |
-| All in one | 192.168.0.50 | stack    | stack    |
+| All in one | 192.168.0.89 | stack    | stack    |

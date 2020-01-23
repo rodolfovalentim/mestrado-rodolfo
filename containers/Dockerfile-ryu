@@ -4,8 +4,6 @@
 
 FROM ubuntu:16.04
 
-MAINTAINER FUJITA Tomonori <fujita.tomonori@lab.ntt.co.jp>
-
 ENV HOME /root
 WORKDIR /root
 

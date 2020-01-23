@@ -576,7 +576,8 @@ class Cloud(object):
 
         if(all_switches is None):
             logger.error(
-                "Some Error occur during topology discovery. Check controllers and network")
+                "Some Error occur during topology discovery. \
+                    Check controllers and network")
             return
 
         d_switches = {}
@@ -631,7 +632,8 @@ class Cloud(object):
 
         if(all_switches is None):
             logger.error(
-                "Some Error occur during topology discovery. Check controllers and network")
+                "Some Error occur during topology discovery. \
+                    Check controllers and network")
             return
 
         d_switches = {switch['dpid']: switch for switch in self.gateway_controller.get_switches()}
