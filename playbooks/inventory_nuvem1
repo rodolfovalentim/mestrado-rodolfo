@@ -2,7 +2,7 @@
 192.168.0.40 ansible_user=root ansible_become=yes
 192.168.0.41 ansible_user=root ansible_become=yes
 
-[conection_nodes]
+[connection_nodes]
 192.168.0.92 ansible_user=root ansible_become=yes
 
 [sdn_controllers]
@@ -20,3 +20,12 @@ container_name=ryu
 tcp_port=6634:6634
 http_port=8087:8087 
 image_name=rodolfo/ubuntu-source-ryu
+controller_endpoint=192.168.0.40
+
+[connection_nodes:vars]
+IP=192.168.0.40
+PROVIDER_INT=em2
+NUVEM1_INT=p1p1
+NUVEM2_INT=p1p2
+INTERNAL_INT=p1p4
+REMOTE_IP=10.82.0.1

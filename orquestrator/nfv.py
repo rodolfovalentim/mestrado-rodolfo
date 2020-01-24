@@ -17,6 +17,9 @@ class VirtualNetworkFunction(VirtualMachine):
         return self.cloud
 
 class FowardingGraphDomain(object):
+    '''
+        Graph inside domain
+    '''
     def __init__(self, *args, **kwargs):
         self.id = kwargs.get('id', None)
         self.nfvi_pop = kwargs.get('nfvi_pop', None)

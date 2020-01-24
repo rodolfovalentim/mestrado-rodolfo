@@ -12,8 +12,9 @@ logger = daiquiri.getLogger(__name__)
 
 
 def create_switch_graph(cloud):
-    graph = GraphUndirectedWeighted(cloud.switches)
-    for link in cloud.links:
+    switches = get_switches(cloud)
+    graph = GraphUndirectedWeighted(switches)
+    for link in get_links(cloud):
         graph.add_edge(link.port_src.dpid, link.port_dst.dpid, 1)
     return graph
 
@@ -85,7 +86,7 @@ def create_chain(flow_classifier, service_chain, simetric=False):
     fgd = FowardingGraphDomain()
     
     for vnf in service_chain:
-        if len(fgd.ordered_vnfs) == 0:
+        if fgd.nfvi_pop is None:
             fgd.nfvi_pop = vnf.get_cloud()
         else:
             if fgd.nfvi_pop.get_name() != vnf.get_cloud().get_name():
@@ -101,29 +102,38 @@ def create_chain(flow_classifier, service_chain, simetric=False):
         
     for domain_chain in chain_per_domain:
         for vnf in domain_chain.ordered_vnfs:
-            target = find_switch(vnf.get_cloud(), vnf.get_ip())
+            target = find_switch(domain_chain.nfvi_pop, vnf.get_ip())
             logger.warn(target)
-            domain_chain.ordered_target_switch.append(target)
+            domain_chain.ordered_target_switches.append(target)
             
         if domain_chain.prev_fgd is not None:
             gw = get_gateway_switch(domain_chain.nfvi_pop)
-            domain_chain.ordered_target_switch = [gw] + domain_chain.ordered_target_switch
-        else: 
-            # Adicionar o classificador de fluxo aqui
-            pass
+            logger.warn('Gateway')
+            logger.warn(gw)
+            domain_chain.ordered_target_switches = [gw] + domain_chain.ordered_target_switches
+       
         if domain_chain.next_fgd is not None:
             gw = get_gateway_switch(domain_chain.nfvi_pop)
-            domain_chain.ordered_target_switch = domain_chain.ordered_target_switch + [gw]
-        else: 
-            # Adicionar o switch de destino de fluxo aqui
-            pass
-        
+            logger.warn('Gateway')
+            logger.warn(gw)
+            domain_chain.ordered_target_switches = domain_chain.ordered_target_switches + [gw]
 
+        graph = create_switch_graph(domain_chain.nfvi_pop)
+            
+        hops_underlay = []  
+        for switch_idx in range(len(domain_chain.ordered_target_switches):
+            hops_underlay.append(get_hop_route(graph, domain_chain.ordered_target_switches[switch_idx], domain_chain.ordered_target_switches[switch_idx + 1]) 
+        
+        logger.warn(get_hop_route(graph, domain_chain.ordered_target_switches[0], domain_chain.ordered_target_switches[1]))
+        # agora que eu consigo obter os saltos, preciso classifica-los. ver os tipos no meu pg. nao ir do zero igual um otario.
+
+
+        return
     
 def get_switches(cloud):
     all_switches = cloud.topology_controller.get_switches()
 
-    assert all_switches is None
+    assert all_switches is not None
 
     d_switches = {}
 
@@ -203,6 +213,10 @@ class GraphUndirectedWeighted(object):
         self.switches_count = len(switches)
         self.adjacency_list = [[] for _ in range(len(switches))]
 
+    def __repr__(self):
+        return "< Cloud Graph {} >".format(self.__dict__)
+        
+
     def add_edge(self, source_dpid, dest_dpid, weight):
         source = [x.dpid for x in self.switches].index(source_dpid)
         dest = [x.dpid for x in self.switches].index(dest_dpid)
@@ -217,9 +231,9 @@ class GraphUndirectedWeighted(object):
         for v in range(self.switches_count):
             yield v
 
-    def dijkstra(self, source_dpid, dest_dpid):
-        source = [x.get_dpid() for x in self.switches].index(source_dpid)
-        dest = [x.get_dpid() for x in self.switches].index(dest_dpid)
+    def dijkstra(self, source, dest):        
+        source = [x.dpid for x in self.switches].index(source.dpid)
+        dest = [x.dpid for x in self.switches].index(dest.dpid)
 
         q = queue.PriorityQueue()
         parents = []
