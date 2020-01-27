@@ -108,14 +108,10 @@ def create_chain(flow_classifier, service_chain, simetric=False):
             
         if domain_chain.prev_fgd is not None:
             gw = get_gateway_switch(domain_chain.nfvi_pop)
-            logger.warn('Gateway')
-            logger.warn(gw)
             domain_chain.ordered_target_switches = [gw] + domain_chain.ordered_target_switches
        
         if domain_chain.next_fgd is not None:
             gw = get_gateway_switch(domain_chain.nfvi_pop)
-            logger.warn('Gateway')
-            logger.warn(gw)
             domain_chain.ordered_target_switches = domain_chain.ordered_target_switches + [gw]
 
         graph = create_switch_graph(domain_chain.nfvi_pop)
