@@ -40,6 +40,13 @@ if __name__ == "__main__":
     cloud2.set_gateway_controller(gw_ctrl_n2)
     
 
+    src = orq.create_virtual_function(cloud=cloud1,
+                                      name='src', 
+                                      availability_zone='nova:controller', 
+                                      vnf_type="src",
+                                      may_exist=True)
+    
+
     dpi = orq.create_virtual_function(cloud=cloud1,
                                       name='dpi', 
                                       availability_zone='nova:controller', 
@@ -65,20 +72,26 @@ if __name__ == "__main__":
                                       vnf_type="edge_firewall_2",
                                       may_exist=True)    
     
-    dst = orq.create_virtual_function(cloud=cloud2,
+    dst = orq.create_virtual_function(cloud=cloud1,
                                       name='dst', 
                                       availability_zone='nova:controller', 
                                       vnf_type="dst",
                                       may_exist=True)
     
     
+    # precisa-se de uma conversao e por isso, inicialmente,
+    # define-se que os campos obrigatorios para um classificador sao
+    # source_ip, source_port, source_cloud, destination_ip, destination_port, protocol, destination_cloud
+    # caso nao sejam encontrados elementos com os ips de origem e destino, o fluxo sera assinalado como externa a rede
+    # e por isso implementados nos switches externos
+        
     orq.create_chain(flow_classifier={
-        'source_ip': '10.0.0.1',
+        'source_ip': '10.80.1.17',
         'source_port': 80,
         'source_cloud': cloud1,
-        'destination_ip': '10.0.101.15',
+        'destination_ip': '10.80.1.7',
         'destination_port': 80,
         'protocol': 'udp',
-        'destination_cloud': cloud2
+        'destination_cloud': cloud1
     }, service_chain=[dpi, nat, edge_fw1])
 
