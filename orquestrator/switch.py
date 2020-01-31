@@ -67,6 +67,11 @@ class Switch(object):
         
         assert port is not None        
         return port.port_no
+    
+    def get_port_by_name(self, port_name):
+        for port in self.ports:
+            if port.name == port_name:
+                return port
 
 
 class Flow(object):
@@ -118,6 +123,10 @@ class Flow(object):
         elif match_type == 'ip_proto':
             self.match["ip_proto"] = 5
             self.match["eth_type"] = 34525
+        elif match_type == 'icmpv4_type':
+            self.match["icmpv4_type"] = 5, 
+            self.match["ip_proto"] = 1
+            self.match["eth_type"] = 2048
         return self.match
 
     def add_action(self, action_type, *argv):

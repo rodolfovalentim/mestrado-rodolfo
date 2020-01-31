@@ -2,8 +2,8 @@
 import daiquiri
 import logging
 from collections import namedtuple
-from nfv import FowardingGraphDomain, FowardingGraphHop, VirtualNetworkFunction
-from switch import Flow, Link, Switch
+from .nfv import FowardingGraphDomain, FowardingGraphHop, VirtualNetworkFunction
+from .switch import Flow, Link, Switch
 from pprint import pprint
 import queue
 
@@ -109,15 +109,19 @@ def create_chain(flow_classifier, service_chain, simetric=False):
                 if fgd.prev_fgd is None:
                     hop.set_flow_classifier(flow_classifier)
                 else:
-                    hop.set_src_gateway(src_vnf.get_cloud())
+                    hop.src_gateway = fgd.nfvi_pop.get_gateway()
                 
             if hop.dest_vnf is None:
                 if fgd.next_fgd is None:
                     hop.set_flow_destination()
                 else:
-                    hop.set_dest_gateway(src_vnf.get_cloud())
+                    hop.dest_gateway = fgd.nfvi_pop.get_gateway()
                     
             hop.create_flows()
+            
+    for fgd in fgds:
+        for hop in fgd.hops:
+            logger.warn(hop)
             hop.install_flows()
                            
     # chain_per_domain = []

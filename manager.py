@@ -1,10 +1,10 @@
 from prettyprinter import pprint
 
-from cloud import Cloud
-from controller import (CoreController, EdgeController,
+from orquestrator.cloud import Cloud
+from orquestrator.controller import (CoreController, EdgeController,
                     ExternalController, TopologyController, GatewayController)
 
-import orquestrator as orq
+import orquestrator.orquestrator as orq
 import daiquiri
 import logging
 

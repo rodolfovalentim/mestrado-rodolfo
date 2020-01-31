@@ -121,3 +121,6 @@ class Cloud(object):
                     vm.add_tap(Tap(**port))
             return vm
         return None
+    
+    def get_gateway(self):
+        return self.gateway_controller.get_switches()[0]
