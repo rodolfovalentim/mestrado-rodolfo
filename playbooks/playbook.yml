@@ -1,0 +1,128 @@
+# - hosts: conection_nodes
+# # Create a bridge named br-int
+#   tasks:
+#     - name: "Create a bridge br-int"
+#       openvswitch_bridge:
+#         bridge: br-test
+#         state: present
+#     # Creates port eth2 on bridge br-ex
+#       # openvswitch_port:
+#       #   bridge: br-int
+#       #   port:  
+#       #   state: present
+#     - name: "Creates port p1p3 on bridge br-int"
+#       openvswitch_port:
+#         bridge: br-test
+#         port: p1p3
+#         state: present
+#         # set: Interface eth6
+
+
+- hosts: sdn_controllers
+  gather_facts: no
+  tasks:
+    - name: Create a directory if it does not exist
+      file:
+        path: /opt/controllers
+        state: directory
+        mode: '0755'
+
+    - name: Copy controller files 
+      copy:
+        src: ../controllers/
+        dest: /opt/controllers
+
+    - name: Create Topology Controller
+      docker_container:
+        name: rodolfo_TopologyController
+        image: rodolfo/ubuntu-source-ryu
+        ports:
+        - "6634:6634"
+        - "8080:8080"
+        command: ryu-manager ryu.app.rest_topology --observe-links --ofp-tcp-listen-port 6634 --wsapi-host 0.0.0.0 --wsapi-port 8080
+
+    - name: Create Core Controller
+      docker_container:
+        name: rodolfo_core_controller
+        image: rodolfo/ubuntu-source-ryu
+        volumes:
+          - /opt/controllers:/opt/controllers
+        ports:
+        - "6635:6635"
+        - "8081:8081"
+        command: ryu-manager /opt/controllers/core-controller.py --ofp-tcp-listen-port 6635 --wsapi-host 0.0.0.0 --wsapi-port 8081
+  
+    - name: Create Edge Controller
+      docker_container:
+        name: rodolfo_EdgeController
+        image: rodolfo/ubuntu-source-ryu
+        volumes:
+          - /opt/controllers:/opt/controllers
+        ports:
+        - "6636:6636"
+        - "8082:8082"
+        command: ryu-manager /opt/controllers/edge-controller.py ryu.app.ofctl_rest --ofp-tcp-listen-port 6636 --wsapi-host 0.0.0.0 --wsapi-port 8082
+
+    - name: Create External Controller
+      docker_container:
+        name: rodolfo_ExternalController
+        image: rodolfo/ubuntu-source-ryu
+        volumes:
+          - /opt/controllers:/opt/controllers
+        ports:
+        - "6637:6637"
+        - "8083:8083"
+        command: ryu-manager /opt/controllers/external-controller.py ryu.app.ofctl_rest --ofp-tcp-listen-port 6637 --wsapi-host 0.0.0.0 --wsapi-port 8083
+
+    - name: Create Gateway Controller
+      docker_container:
+        name: rodolfo_GatewayController
+        image: rodolfo/ubuntu-source-ryu
+        volumes:
+          - /opt/controllers:/opt/controllers
+        ports:
+        - "6638:6638"
+        - "8084:8084"
+        command: ryu-manager ryu.app.ofctl_rest  --ofp-tcp-listen-port 6638 --wsapi-host 0.0.0.0 --wsapi-port 8084
+       
+# - hosts: localhost
+#   gather_facts: no
+#   become: true
+#   tasks:
+#     - name: add container to inventory
+#       add_host:
+#         name: openvswitch_vswitchd_{{ item }}
+#         group: openvswitch_conteiners
+#         ansible_connection: docker
+#         ansible_host: openvswitch_vswitchd
+#         ansible_docker_extra_args: "-H=tcp://{{ item }}:2375"
+#         ansible_user: root
+#       with_items: '{{ groups.nodes }}'
+
+# - hosts: openvswitch_conteiners, connection_nodes
+#   gather_facts: no
+#   become: true
+#   tasks:
+#     - name: setting controllers in br-ex (core)
+#       raw: ovs-vsctl set-controller br-ex tcp:127.0.0.1:6633 tcp:192.168.0.40:6634 tcp:192.168.0.40:6635
+
+# - hosts: openvswitch_conteiners
+#   gather_facts: no
+#   become: true
+#   tasks:
+#     - name: setting controllers in br-int (edge)
+#       raw: ovs-vsctl set-controller br-int tcp:127.0.0.1:6633 tcp:192.168.0.40:6634 tcp:192.168.0.40:6636
+
+# - hosts: connection_nodes
+#   gather_facts: no
+#   become: true
+#   tasks:
+#     - name: setting controllers in br-sfc (gateway)
+#       raw: ovs-vsctl set-controller br-sfc tcp:127.0.0.1:6633 tcp:192.168.0.40:6634 tcp:192.168.0.40:6638
+
+# - hosts: connection_nodes
+#   gather_facts: no
+#   become: true
+#   tasks:
+#     - name: setting controllers in br-int (external)
+#       raw: ovs-vsctl set-controller br-sfc tcp:127.0.0.1:6633 tcp:192.168.0.40:6634 tcp:192.168.0.40:6637

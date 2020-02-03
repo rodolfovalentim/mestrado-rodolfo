@@ -11,19 +11,19 @@ class Controller(object):
     def __init__(self, *args, **kwargs):
         self.endpoint = kwargs.get('endpoint', '127.0.0.1')
         self.port = kwargs.get('port', '6633')
-
+        
 class TopologyController(Controller):
     switches_path = "v1.0/topology/switches"
     links_path = "v1.0/topology/links"
 
     def __init__(self, *args, **kwargs):
-        super().__init__(kwargs)
+        super().__init__(*args, **kwargs)
         self.wsgi_port = kwargs.get('wsgi_port', '8080')
 
     def get_switches(self):
         url = "http://{}:{}/{}".format(self.endpoint,
                                        self.wsgi_port, self.switches_path)
-
+        
         try:
             response = requests.get(url)
             response.raise_for_status()
@@ -33,6 +33,7 @@ class TopologyController(Controller):
             return
 
         r_switches = response.json()
+        
         return r_switches
 
     def get_links(self):

@@ -2,8 +2,8 @@
 import daiquiri
 import logging
 from collections import namedtuple
-from nfv import FowardingGraphDomain, FowardingGraphHop, VirtualNetworkFunction
-from switch import Flow, Link, Switch
+from .nfv import FowardingGraphDomain, FowardingGraphHop, VirtualNetworkFunction
+from .switch import Flow, Link, Switch
 from pprint import pprint
 import queue
 
@@ -12,8 +12,9 @@ logger = daiquiri.getLogger(__name__)
 
 
 def create_switch_graph(cloud):
-    graph = GraphUndirectedWeighted(cloud.switches)
-    for link in cloud.links:
+    switches = get_switches(cloud)
+    graph = GraphUndirectedWeighted(switches)
+    for link in get_links(cloud):
         graph.add_edge(link.port_src.dpid, link.port_dst.dpid, 1)
     return graph
 
@@ -79,51 +80,92 @@ def find_switch(cloud, ip):
 
 
 def create_chain(flow_classifier, service_chain, simetric=False):
-    # First, split chain between nfvi-pops   
-    chain_per_domain = []
-    current_domain = []
-    fgd = FowardingGraphDomain()
+    
+    fgds = [FowardingGraphDomain()]
+    fgds[-1].nfvi_pop = flow_classifier["source_cloud"]
+    fgds[-1].hops.append(FowardingGraphHop())
+    
+    source_switch = find_switch(flow_classifier["source_cloud"], flow_classifier["source_ip"])    
+    fgds[-1].hops[-1].src_edge_switch = source_switch
     
     for vnf in service_chain:
-        if len(fgd.ordered_vnfs) == 0:
-            fgd.nfvi_pop = vnf.get_cloud()
-        else:
-            if fgd.nfvi_pop.get_name() != vnf.get_cloud().get_name():
-                chain_per_domain.append(fgd)
-                fgd = FowardingGraphDomain()
-        fgd.ordered_vnfs.append(vnf)
-    chain_per_domain.append(fgd)
-
-    for chain_idx in range(len(chain_per_domain) - 2):
-        if chain_idx > 0:
-            chain_per_domain[chain_idx].prev_fgd = chain_per_domain[chain_idx - 1]
-        chain_per_domain[chain_idx].next_fgd = chain_per_domain[chain_idx + 1]
-        
-    for domain_chain in chain_per_domain:
-        for vnf in domain_chain.ordered_vnfs:
-            target = find_switch(vnf.get_cloud(), vnf.get_ip())
-            logger.warn(target)
-            domain_chain.ordered_target_switch.append(target)
+        if fgds[-1].nfvi_pop.get_name() != vnf.get_cloud().get_name():
+            fgds.append(FowardingGraphDomain())
+            fgds[-1].nfvi_pop = flow_classifier["source_cloud"]
+            fgds[-1].hops.append(FowardingGraphHop())
             
-        if domain_chain.prev_fgd is not None:
-            gw = get_gateway_switch(domain_chain.nfvi_pop)
-            domain_chain.ordered_target_switch = [gw] + domain_chain.ordered_target_switch
-        else: 
-            # Adicionar o classificador de fluxo aqui
-            pass
-        if domain_chain.next_fgd is not None:
-            gw = get_gateway_switch(domain_chain.nfvi_pop)
-            domain_chain.ordered_target_switch = domain_chain.ordered_target_switch + [gw]
-        else: 
-            # Adicionar o switch de destino de fluxo aqui
-            pass
-        
-
+        target_switch = find_switch(vnf.get_cloud(), vnf.get_ip())
+        fgds[-1].hops[-1].dest_vnf = vnf
+        fgds[-1].hops[-1].dest_edge_switch = target_switch
+        fgds[-1].hops.append(FowardingGraphHop(src_vnf=vnf))
+        fgds[-1].hops[-1].src_edge_switch = target_switch
     
-def get_switches(cloud):
+    destination_switch = find_switch(flow_classifier["destination_cloud"], flow_classifier["destination_ip"]) 
+    fgds[-1].hops[-1].dest_edge_switch = destination_switch
+    
+    for fgd in fgds:
+        for hop in fgd.hops:
+            if hop.src_vnf is None:
+                if fgd.prev_fgd is None:
+                    hop.set_flow_classifier(flow_classifier)
+                else:
+                    hop.src_gateway = fgd.nfvi_pop.get_gateway()
+                
+            if hop.dest_vnf is None:
+                if fgd.next_fgd is None:
+                    hop.set_flow_destination()
+                else:
+                    hop.dest_gateway = fgd.nfvi_pop.get_gateway()
+                    
+            hop.create_flows()
+            
+    for fgd in fgds:
+        for hop in fgd.hops:
+            logger.warn(hop)
+            hop.install_flows()
+                           
+    # chain_per_domain = []
+    # current_fgd = FowardingGraphDomain()
+    
+    # if service_chain != []:
+    #     current_fgd.nfvi_pop = service_chain[0].get_cloud()
+    
+    # for vnf in service_chain:
+    #     if current_fgd.nfvi_pop.get_name() != vnf.get_cloud().get_name():
+    #         chain_per_domain.append(current_fgd)
+    #         current_fgd = FowardingGraphDomain()
+    #         current_fgd.nfvi_pop = vnf.get_cloud()
+            
+    #         # Saving references
+    #         current_fgd.prev_fgd = chain_per_domain[-1]
+    #         chain_per_domain[-1].next_fgd = current_fgd
+            
+    #     current_hop = FowardingGraphHop(dest_vnf=vnf)
+    #     if len(current_fgd.intradomain_hops) > 0:
+    #         current_hop.src_vnf = current_fgd.intradomain_hops[-1].dest_vnf
+            
+    #     current_fgd.intradomain_hops.append(current_hop)
+    #     # current_fgd.ordered_vnfs.append(vnf)
+    # chain_per_domain.append(current_fgd)
+
+    # for chain in chain_per_domain:
+    #     for hop in chain.intradomain_hops:
+    #         if hop.prev_hop is None and chain.prev_fgd is None:
+    #             # primeiro salto de todos. eh preciso ter o classificador de fluxo
+                
+    #         if hop.next_hop is None and chain.next_fgd is None:
+    #             # ultimo salto de todos, restaurar o pacote para o original
+                
+    #         if hop.prev_hop is None and chain.prev_fgd is not None:
+    #             # primeiro salto de um dominio, tem que buscar no gateway
+            
+    #         if hop.next_hop is None and chain.next_fgd is not None:
+    #             # ultimo salto de um dominio, tem que mandar para um gateway
+
+def get_switches(cloud):    
     all_switches = cloud.topology_controller.get_switches()
 
-    assert all_switches is None
+    assert all_switches is not None
 
     d_switches = {}
 
@@ -203,6 +245,10 @@ class GraphUndirectedWeighted(object):
         self.switches_count = len(switches)
         self.adjacency_list = [[] for _ in range(len(switches))]
 
+    def __repr__(self):
+        return "< Cloud Graph {} >".format(self.__dict__)
+        
+
     def add_edge(self, source_dpid, dest_dpid, weight):
         source = [x.dpid for x in self.switches].index(source_dpid)
         dest = [x.dpid for x in self.switches].index(dest_dpid)
@@ -217,9 +263,9 @@ class GraphUndirectedWeighted(object):
         for v in range(self.switches_count):
             yield v
 
-    def dijkstra(self, source_dpid, dest_dpid):
-        source = [x.get_dpid() for x in self.switches].index(source_dpid)
-        dest = [x.get_dpid() for x in self.switches].index(dest_dpid)
+    def dijkstra(self, source, dest):        
+        source = [x.dpid for x in self.switches].index(source.dpid)
+        dest = [x.dpid for x in self.switches].index(dest.dpid)
 
         q = queue.PriorityQueue()
         parents = []

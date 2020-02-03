@@ -1,10 +1,10 @@
 from prettyprinter import pprint
 
-from cloud import Cloud
-from controller import (CoreController, EdgeController,
+from orquestrator.cloud import Cloud
+from orquestrator.controller import (CoreController, EdgeController,
                     ExternalController, TopologyController, GatewayController)
 
-import orquestrator as orq
+import orquestrator.orquestrator as orq
 import daiquiri
 import logging
 
@@ -13,17 +13,17 @@ logger = daiquiri.getLogger(__name__)
 
 if __name__ == "__main__":
     
-    topo_ctrl_n1 = TopologyController(endpoint="127.0.0.1", port="6634", wsgi_port="8080")
-    core_ctrl_n1 = CoreController(endpoint="127.0.0.1", port="6635", wsgi_port="8081")
-    edge_ctrl_n1 = EdgeController(endpoint="127.0.0.1", port="6636", wsgi_port="8082")
-    ext_ctrl_n1 = ExternalController(endpoint="127.0.0.1", port="6637", wsgi_port="8083")
-    gw_ctrl_n1 = GatewayController(endpoint="127.0.0.1", port="6638", wsgi_port="8084")
+    topo_ctrl_n1 = TopologyController(endpoint="192.168.0.40", port="6634", wsgi_port="8080")  
+    core_ctrl_n1 = CoreController(endpoint="192.168.0.40", port="6635", wsgi_port="8081")
+    edge_ctrl_n1 = EdgeController(endpoint="192.168.0.40", port="6636", wsgi_port="8082")
+    ext_ctrl_n1 = ExternalController(endpoint="192.168.0.40", port="6637", wsgi_port="8083")
+    gw_ctrl_n1 = GatewayController(endpoint="192.168.0.40", port="6638", wsgi_port="8084")
     
-    topo_ctrl_n2 = TopologyController(endpoint="127.0.0.1", port="6634", wsgi_port="8080")
-    core_ctrl_n2 = CoreController(endpoint="127.0.0.1", port="6635", wsgi_port="8081")
-    edge_ctrl_n2 = EdgeController(endpoint="127.0.0.1", port="6636", wsgi_port="8082")
-    ext_ctrl_n2 = ExternalController(endpoint="127.0.0.1", port="6637", wsgi_port="8083")
-    gw_ctrl_n2 = GatewayController(endpoint="127.0.0.1", port="6638", wsgi_port="8084")
+    topo_ctrl_n2 = TopologyController(endpoint="192.168.0.50", port="6634", wsgi_port="8080")
+    core_ctrl_n2 = CoreController(endpoint="192.168.0.50", port="6635", wsgi_port="8081")
+    edge_ctrl_n2 = EdgeController(endpoint="192.168.0.50", port="6636", wsgi_port="8082")
+    ext_ctrl_n2 = ExternalController(endpoint="192.168.0.50", port="6637", wsgi_port="8083")
+    gw_ctrl_n2 = GatewayController(endpoint="192.168.0.50", port="6638", wsgi_port="8084")
     
     cloud1 = Cloud(name='nuvem01')
     cloud1.set_topology_controller(topo_ctrl_n1)
@@ -39,15 +39,13 @@ if __name__ == "__main__":
     cloud2.set_external_controller(ext_ctrl_n2)
     cloud2.set_gateway_controller(gw_ctrl_n2)
     
-    # classifier = {
-    #     'source_ip': '10.0.0.1',
-    #     'source_port': 80,
-    #     'source_cloud': cloud1,
-    #     'destination_ip': '10.0.101.15',
-    #     'destination_port': 80,
-    #     'protocol': 'udp',
-    #     'destination_cloud': cloud2
-    # }
+
+    src = orq.create_virtual_function(cloud=cloud1,
+                                      name='src', 
+                                      availability_zone='nova:controller', 
+                                      vnf_type="src",
+                                      may_exist=True)
+    
 
     dpi = orq.create_virtual_function(cloud=cloud1,
                                       name='dpi', 
@@ -74,12 +72,26 @@ if __name__ == "__main__":
                                       vnf_type="edge_firewall_2",
                                       may_exist=True)    
     
-    dst = orq.create_virtual_function(cloud=cloud2,
+    dst = orq.create_virtual_function(cloud=cloud1,
                                       name='dst', 
                                       availability_zone='nova:controller', 
                                       vnf_type="dst",
                                       may_exist=True)
     
     
-    # orq.create_chain(flow_classifier=classifier, 
-    #                  service_chain=[dpi, edge_fw1])
+    # precisa-se de uma conversao e por isso, inicialmente,
+    # define-se que os campos obrigatorios para um classificador sao
+    # source_ip, source_port, source_cloud, destination_ip, destination_port, protocol, destination_cloud
+    # caso nao sejam encontrados elementos com os ips de origem e destino, o fluxo sera assinalado como externa a rede
+    # e por isso implementados nos switches externos
+        
+    orq.create_chain(flow_classifier={
+        'source_ip': '10.80.1.17',
+        'source_port': 80,
+        'source_cloud': cloud1,
+        'destination_ip': '10.80.1.7',
+        'destination_port': 80,
+        'protocol': 'udp',
+        'destination_cloud': cloud1
+    }, service_chain=[dpi, nat, edge_fw1])
+

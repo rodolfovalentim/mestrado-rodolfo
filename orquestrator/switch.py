@@ -67,6 +67,11 @@ class Switch(object):
         
         assert port is not None        
         return port.port_no
+    
+    def get_port_by_name(self, port_name):
+        for port in self.ports:
+            if port.name == port_name:
+                return port
 
 
 class Flow(object):
@@ -90,41 +95,38 @@ class Flow(object):
         }
 
     def add_match(self, match_type, *argv):
-        if match_type == 'in_port':
-            self.match['in_port'] = argv[0]
-        elif match_type == 'dl_src':
-            self.match['dl_src'] = argv[0]
-        elif match_type == 'dl_dst':
-            self.match['dl_dst'] = argv[0]
-        elif match_type == 'dl_vlan':
-            self.match['dl_vlan'] = argv[0]
-        elif match_type == 'dl_vlan_pcp':
-            self.match['dl_vlan_pcp'] = argv[0]
-            self.match['dl_vlan'] = argv[1]
-        elif match_type == 'dl_type':
-            self.match['dl_type'] = argv[0]
-        elif match_type == 'nw_tos':
-            self.match['nw_tos'] = argv[0]
-        elif match_type == 'nw_proto':
-            self.match['nw_proto'] = argv[0]
-            self.match['dl_type'] = 2048
-        elif match_type == 'nw_src':
-            self.match['nw_src'] = argv[0]
-            self.match['dl_type'] = 2048
-        elif match_type == 'nw_dst':
-            self.match['nw_dst'] = argv[0]
-            self.match['dl_type'] = 2048
-        elif match_type == 'tp_src':
-            self.match['tp_src'] = argv[0]
-            self.match['dl_type'] = 2048
-        elif match_type == 'tp_dst':
-            self.match['nw_proto'] = argv[0]
-            self.match['tp_dst'] = argv[1]
-            self.match['dl_type'] = 2048
+        if match_type == 'tcp_src':
+            self.match["tcp_src"] = argv[0], 
+            self.match["ip_proto"] = 6
+            self.match["eth_type"] = 2048
+        elif match_type == 'tcp_dst':
+            self.match["tcp_dst"] = argv[0], 
+            self.match["ip_proto"] = 6
+            self.match["eth_type"] = 2048
+        elif match_type == 'udp_src':
+            self.match["udp_src"] = argv[0], 
+            self.match["ip_proto"] = 17
+            self.match["eth_type"] = 2048
         elif match_type == 'udp_dst':
-            self.match['udp_dst'] = argv[0]
-            self.match['ip_proto'] = 17
-            self.match['eth_type'] = 2048
+            self.match["udp_dst"] = argv[0], 
+            self.match["ip_proto"] = 17
+            self.match["eth_type"] = 2048
+        elif match_type == 'ipv4_src':
+            self.match["ipv4_src"] = argv[0] 
+            self.match["eth_type"] = 2048
+        elif match_type == 'ipv4_dst':
+            self.match["ipv4_dst"] = argv[0]
+            self.match["eth_type"] = 2048
+        elif match_type == 'arp_op':
+            self.match["arp_op"] = 3
+            self.match["eth_type"] = 2054
+        elif match_type == 'ip_proto':
+            self.match["ip_proto"] = 5
+            self.match["eth_type"] = 34525
+        elif match_type == 'icmpv4_type':
+            self.match["icmpv4_type"] = 5, 
+            self.match["ip_proto"] = 1
+            self.match["eth_type"] = 2048
         return self.match
 
     def add_action(self, action_type, *argv):
