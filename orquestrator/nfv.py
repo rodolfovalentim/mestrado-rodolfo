@@ -72,7 +72,7 @@ class FowardingGraphHop(object):
         elif flow_classifier['protocol'] == 'arp':
             self.src_flow.add_match('arp_op')
 
-    def set_dest_gateway(self):
+    def set_flow_destination(self):
         if self.dest_vnf is not None:
             self.dest_flow = Flow()
             self.add_action("SET_DL_DST", self.dest_vnf.ip[0].mac_address)
@@ -82,7 +82,12 @@ class FowardingGraphHop(object):
             
 
     def create_flows(self):
-        pass
+        if self.
+
+        if self.src_edge_switch == self.dest_edge_switch:
+            pass
+        else self.src_edge_switch != self.dest_edge_switch:
+            pass    
 
     def install_flows(self):
         pass
