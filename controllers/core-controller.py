@@ -60,7 +60,7 @@ class CoreController(app_manager.RyuApp):
 
         # install the table-miss flow entry.
         match = parser.OFPMatch(
-            eth_src=("00:00:00:00:00:00", "00:00:00:00:00:00"))
+            eth_dst=("92:00:00:00:00:00", "FF:00:00:00:00:00"))
         actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER,
                                           ofproto.OFPCML_NO_BUFFER)]
         self.logger.info("Switch %s has key %s" % (datapath.id, new_key))
@@ -84,7 +84,7 @@ class CoreController(app_manager.RyuApp):
         if not pkt_ethernet:
             return
         pkt_keyflow = pkt.get_protocol(ethernet.ethernet)
-        if pkt_keyflow.src[0:2] == '90':
+        if pkt_keyflow.dst[0:2] == '92':
             self._handle_keyflow(datapath, port, pkt_keyflow, pkt)
             return
         elif pkt_keyflow.dst == '01:80:c2:00:00:0e':
@@ -139,9 +139,9 @@ class CoreController(app_manager.RyuApp):
 
         # install the table-miss flow entry.
         match = parser.OFPMatch(
-            in_port=port, eth_src=(pkt_keyflow.src))
+            in_port=port, eth_dst=(pkt_keyflow.dst))
 
-        route_key = self.mac_to_int(pkt_keyflow.src[0:11])
+        route_key = self.mac_to_int(pkt_keyflow.dst[0:11])
         switch_key = self.dpid_to_key[datapath.id]
         output_port = route_key % switch_key
 
@@ -150,7 +150,7 @@ class CoreController(app_manager.RyuApp):
 
         actions = [parser.OFPActionOutput(
             output_port, ofproto.OFPCML_NO_BUFFER)]
-        self.add_flow(datapath, 0, match, actions)
+        self.add_flow(datapath, 101, match, actions)
         return
 
     def add_flow(self, datapath, priority, match, actions):
