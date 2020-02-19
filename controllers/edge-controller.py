@@ -148,7 +148,7 @@ class RestController(ControllerBase):
 
         datapath.send_msg(mod)
 
-# Example of a request
+# Example of a request to add and delete an arp reply flow
 # {
 # 	"dpid": "1",
 # 	"in_port": "1",
