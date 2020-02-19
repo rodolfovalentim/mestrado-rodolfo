@@ -66,14 +66,20 @@ class RestController(ControllerBase):
 
     @route('nodes', '/del_arp_flow', methods=['POST'])
     def del_arp_flow(self, req, **kwargs):
-        pass
+        datapath = None
+        switches = get_switch(self.edge_app, None)
+        for switch in switches:
+            if str(switch.dp.id) == req.json.get('dpid'):
+                datapath = switch.dp
+                self._del_arp_reply_flow(datapath,
+                     in_port=req.json.get('in_port'),
+                     arp_tpa=req.json.get('arp_tpa'))
 
     def _add_arp_reply_flow(self, datapath, in_port, arp_tpa, arp_tha):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
 
         match = parser.OFPMatch(
-            # metadata=(tag, parser.UINT64_MAX),    
             in_port=int(in_port),
             eth_type=ether_types.ETH_TYPE_ARP,
             arp_op=arp.ARP_REQUEST,
@@ -97,6 +103,18 @@ class RestController(ControllerBase):
 
         self._add_flow(datapath, PRIORITY_ARP_REPLY, match, instructions,
                        table_id=TABLE_ID_EGRESS)
+
+      
+    def _del_arp_reply_flow(self, datapath, in_port, arp_tpa):
+        parser = datapath.ofproto_parser
+
+        match = parser.OFPMatch(
+            in_port=int(in_port),
+            eth_type=ether_types.ETH_TYPE_ARP,
+            arp_op=arp.ARP_REQUEST,
+            arp_tpa=arp_tpa)
+
+        self._del_flow(datapath, PRIORITY_ARP_REPLY, match)
 
     @staticmethod
     def _add_flow(datapath, priority, match, instructions,
@@ -125,6 +143,8 @@ class RestController(ControllerBase):
             out_port=ofproto.OFPP_ANY,
             out_group=ofproto.OFPG_ANY,
             match=match)
+
+        print(match)
 
         datapath.send_msg(mod)
 
