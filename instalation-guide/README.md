@@ -47,7 +47,7 @@ ip route add default via $GATEWAY_MGMT dev $INTERFACE_MGMT
 
 ifconfig $INTERFACE_PROVIDER up
 nmcli con mod $INTERFACE_PROVIDER connection.autoconnect yes
-nmcli con mod \$INTERFACE_PROVIDER ipv4.method disabled
+nmcli con mod $INTERFACE_PROVIDER ipv4.method disabled
 
 # Configure hosts
 
