@@ -79,7 +79,7 @@ if __name__ == "__main__":
                                       may_exist=True)
     
     
-    # precisa-se de uma conversao e por isso, inicialmente,
+    # precisa-se de uma convencao e por isso, inicialmente,
     # define-se que os campos obrigatorios para um classificador sao
     # source_ip, source_port, source_cloud, destination_ip, destination_port, protocol, destination_cloud
     # caso nao sejam encontrados elementos com os ips de origem e destino, o fluxo sera assinalado como externa a rede

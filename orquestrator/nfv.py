@@ -81,13 +81,33 @@ class FowardingGraphHop(object):
             self.add_action("OUTPUT", self.dest_edge_switch.get_port_by_name(self.dest_vnf.ip[0].name).port_no)
             
 
-    def create_flows(self):
-        if self.
-
+    def create_flows(self):          
         if self.src_edge_switch == self.dest_edge_switch:
-            pass
-        else self.src_edge_switch != self.dest_edge_switch:
-            pass    
+            # TODO: talvez utilizar uma lista de flows.
+            self.src_flow.add_match("dl_dst", self.prev_hop.id)
+            port_name = self.prev_hop.dest_vnf.get_port()
+            in_port = self.prev_hop.dest_edge_switch.get_port_by_name(port_name)
+            self.src_flow.add_match("in_port", in_port)
+            self.src_flow.add_action('OUTPUT', self.src_edge_switch.get_port_by_name("phy-br-ex"))
+
+            self.src_flow.add_action("SET_DL_DST", self.hop_id)
+            dest_port_name = self.dest_vnf.get_port()
+            output_port = self.dest_edge_switch.get_port_by_name(port_name)
+            self.src_flow.add_action("OUTPUT", output_port)
+               
+        elif self.src_edge_switch != self.dest_edge_switch:
+            self.src_flow.add_match("dl_dst", self.prev_hop.id)
+            port_name = self.prev_hop.dest_vnf.get_port()
+            in_port = self.prev_hop.dest_edge_switch.get_port_by_name(port_name)
+            self.src_flow.add_match("in_port", in_port)
+            self.src_flow.add_action('OUTPUT', self.src_edge_switch.get_port_by_name("phy-br-ex"))
+
+            self.src_flow.add_action("SET_DL_DST", self.hop_id)
+            dest_port_name = self.dest_vnf.get_port()
+            output_port = self.dest_edge_switch.get_port_by_name(port_name)
+            self.src_flow.add_action("OUTPUT", output_port)
 
     def install_flows(self):
-        pass
+        print(self.src_flow.get_flow())
+        print(self.dest_flow.get_flow())
+        

@@ -34,7 +34,7 @@
 
     - name: Create Topology Controller
       docker_container:
-        name: rodolfo_TopologyController
+        name: rodolfo_topology_controller
         image: rodolfo/ubuntu-source-ryu
         ports:
         - "6634:6634"
@@ -54,7 +54,7 @@
   
     - name: Create Edge Controller
       docker_container:
-        name: rodolfo_EdgeController
+        name: rodolfo_edge_controller
         image: rodolfo/ubuntu-source-ryu
         volumes:
           - /opt/controllers:/opt/controllers
@@ -65,7 +65,7 @@
 
     - name: Create External Controller
       docker_container:
-        name: rodolfo_ExternalController
+        name: rodolfo_external_controller
         image: rodolfo/ubuntu-source-ryu
         volumes:
           - /opt/controllers:/opt/controllers
@@ -76,7 +76,7 @@
 
     - name: Create Gateway Controller
       docker_container:
-        name: rodolfo_GatewayController
+        name: rodolfo_gateway_controller
         image: rodolfo/ubuntu-source-ryu
         volumes:
           - /opt/controllers:/opt/controllers

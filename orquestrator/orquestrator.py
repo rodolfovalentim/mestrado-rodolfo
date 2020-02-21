@@ -124,44 +124,6 @@ def create_chain(flow_classifier, service_chain, simetric=False):
             logger.warn(hop)
             hop.install_flows()
                            
-    # chain_per_domain = []
-    # current_fgd = FowardingGraphDomain()
-    
-    # if service_chain != []:
-    #     current_fgd.nfvi_pop = service_chain[0].get_cloud()
-    
-    # for vnf in service_chain:
-    #     if current_fgd.nfvi_pop.get_name() != vnf.get_cloud().get_name():
-    #         chain_per_domain.append(current_fgd)
-    #         current_fgd = FowardingGraphDomain()
-    #         current_fgd.nfvi_pop = vnf.get_cloud()
-            
-    #         # Saving references
-    #         current_fgd.prev_fgd = chain_per_domain[-1]
-    #         chain_per_domain[-1].next_fgd = current_fgd
-            
-    #     current_hop = FowardingGraphHop(dest_vnf=vnf)
-    #     if len(current_fgd.intradomain_hops) > 0:
-    #         current_hop.src_vnf = current_fgd.intradomain_hops[-1].dest_vnf
-            
-    #     current_fgd.intradomain_hops.append(current_hop)
-    #     # current_fgd.ordered_vnfs.append(vnf)
-    # chain_per_domain.append(current_fgd)
-
-    # for chain in chain_per_domain:
-    #     for hop in chain.intradomain_hops:
-    #         if hop.prev_hop is None and chain.prev_fgd is None:
-    #             # primeiro salto de todos. eh preciso ter o classificador de fluxo
-                
-    #         if hop.next_hop is None and chain.next_fgd is None:
-    #             # ultimo salto de todos, restaurar o pacote para o original
-                
-    #         if hop.prev_hop is None and chain.prev_fgd is not None:
-    #             # primeiro salto de um dominio, tem que buscar no gateway
-            
-    #         if hop.next_hop is None and chain.next_fgd is not None:
-    #             # ultimo salto de um dominio, tem que mandar para um gateway
-
 def get_switches(cloud):    
     all_switches = cloud.topology_controller.get_switches()
 

@@ -19,6 +19,9 @@ class VirtualMachine(object):
     def add_tap(self, tap):
         self.taps.append(tap)
 
+    def get_port(self):
+        return self.taps[0].name
+
 
 class Tap(object):
     def __init__(self, *args, **kwargs):
