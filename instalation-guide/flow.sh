@@ -3,7 +3,6 @@
 docker exec -u 0 rodolfo-openvswitch ovs-ofctl add-flow br-int "table=0, priority=100, in_port=br-int-p1, ip, nw_src=10.80.2.1, nw_dst=10.83.1.7, actions=mod_dl_dst=90:00:00:00:00:01, output=int-br-ex" --names
 docker exec -u 0 rodolfo-openvswitch ovs-ofctl add-flow br-ex "table=0, priority=100, in_port=ex-br-int, dl_dst=90:00:00:00:00:01, actions=output=p1p1"
 
-
 ##192.168.0.40
 docker exec -u 0 openvswitch_vswitchd ovs-vsctl show br-ex
 docker exec -u 0 openvswitch_vswitchd ovs-ofctl add-flow br-ex "table=0, priority=100, in_port=em2, dl_dst=90:00:00:00:00:01, actions=output=phy-br-ex"

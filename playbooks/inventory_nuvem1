@@ -9,18 +9,22 @@
 192.168.0.40 ansible_user=root ansible_become=yes
 
 [nodes:vars]
-container_name=openvswitch_vswitchd 
-edge_bridge_name=br-int 
-edge_ctrls_endpoints="tcp:127.0.0.1:6633 tcp:192.168.0.40:6634 tcp:192.168.0.40:6636"
-core_bridge_name=br-ex 
-core_ctrls_endpoints="tcp:127.0.0.1:6633 tcp:192.168.0.40:6634 tcp:192.168.0.40:6635"
+CONTAINER_NAME=openvswitch_vswitchd 
+DEFAULT_CTRL_ENDPOINT="tcp:127.0.0.1:6633"
+TOPOLOGY_CTRL_ENDPOINT="tcp:192.168.0.40:6634"
+CORE_CTRL_ENDPOINT="tcp:192.168.0.40:6635"
+EDGE_CTRL_ENDPOINT="tcp:192.168.0.40:6636"
+OFCTL_CTRL_ENDPOINT="tcp:192.168.0.40:6638"
+TUNNEL_CTRL_ENDPOINT="tcp:192.168.0.40:6639"
 
 [sdn_controllers:vars]
-container_name=ryu
-tcp_port=6634:6634
-http_port=8087:8087 
-image_name=rodolfo/ubuntu-source-ryu
-controller_endpoint=192.168.0.40
+IMAGE_NAME=rodolfo/ubuntu-source-ryu
+DEFAULT_CTRL_ENDPOINT="tcp:127.0.0.1:6633"
+TOPOLOGY_CTRL_ENDPOINT="tcp:192.168.0.40:6634"
+CORE_CTRL_ENDPOINT="tcp:192.168.0.40:6635"
+EDGE_CTRL_ENDPOINT="tcp:192.168.0.40:6636"
+OFCTL_CTRL_ENDPOINT="tcp:192.168.0.40:6638"
+TUNNEL_CTRL_ENDPOINT="tcp:192.168.0.40:6639"
 
 [connection_nodes:vars]
 IP=192.168.0.40
@@ -29,3 +33,19 @@ NUVEM1_INT=p1p1
 NUVEM2_INT=p1p2
 INTERNAL_INT=p1p4
 REMOTE_IP=10.82.0.1
+DEFAULT_CTRL_ENDPOINT="tcp:127.0.0.1:6633"
+TOPOLOGY_CTRL_ENDPOINT="tcp:192.168.0.40:6634"
+CORE_CTRL_ENDPOINT="tcp:192.168.0.40:6635"
+EDGE_CTRL_ENDPOINT="tcp:192.168.0.40:6636"
+OFCTL_CTRL_ENDPOINT="tcp:192.168.0.40:6638"
+TUNNEL_CTRL_ENDPOINT="tcp:192.168.0.40:6639"
+
+[openvswitch_conteiners]
+
+[openvswitch_conteiners:vars]
+DEFAULT_CTRL_ENDPOINT="tcp:127.0.0.1:6633"
+TOPOLOGY_CTRL_ENDPOINT="tcp:192.168.0.40:6634"
+CORE_CTRL_ENDPOINT="tcp:192.168.0.40:6635"
+EDGE_CTRL_ENDPOINT="tcp:192.168.0.40:6636"
+OFCTL_CTRL_ENDPOINT="tcp:192.168.0.40:6638"
+TUNNEL_CTRL_ENDPOINT="tcp:192.168.0.40:6639"

@@ -1,10 +1,3 @@
-- hosts: connection_nodes
-  gather_facts: no
-  become: true
-  tasks:
-    - name: creating integration bridge br-int (edge)
-      raw: ovs-vsctl --may-exist add-br br-int
-
 # br-int vai estar conectada a rede provider
 - hosts: connection_nodes
   gather_facts: no
@@ -17,65 +10,66 @@
   gather_facts: no
   become: true
   tasks:
-    - name: creating integration bridge br-int (edge)
-      raw: ovs-vsctl add-port br-int {{ PROVIDER_INT }}
+    - name: adding interface connected to privider network to integration bridge
+      raw: ovs-vsctl --may-exist add-port br-int {{ PROVIDER_INT }}
 
 # Conectando as interfaces das outras nuvens a br-ex
 - hosts: connection_nodes
   gather_facts: no
   become: true
   tasks:
-    - name: creating integration bridge br-int (edge)
+    - name: creating external bridge br-ex (core)
       raw: ovs-vsctl --may-exist add-br br-ex
 
+# TODO: This must be a loop over a list of interfaces
 - hosts: connection_nodes
   gather_facts: no
   become: true
   tasks:
-    - name: creating integration bridge br-int (edge)
-      raw: ovs-vsctl add-port br-ex {{ NUVEM1_INT }} 
+    - name: connecting to a compute host over {{ NUVEM1_INT }} and br-ex
+      raw: ovs-vsctl --may-exist add-port br-ex {{ NUVEM1_INT }} 
 
 - hosts: connection_nodes
   gather_facts: no
   become: true
   tasks:
-    - name: creating integration bridge br-int (edge)
-      raw: ovs-vsctl add-port br-ex {{ NUVEM2_INT }} 
+    - name: connecting to a compute host over {{ NUVEM2_INT }}  and br-ex
+      raw: ovs-vsctl --may-exist add-port br-ex {{ NUVEM2_INT }} 
 
 - hosts: connection_nodes
   gather_facts: no
   become: true
   tasks:
-    - name: creating integration bridge br-int (edge)
+    - name: creating integration bridge br-sfc (tunnel)
       raw: ovs-vsctl --may-exist add-br br-sfc
 
 - hosts: connection_nodes
   gather_facts: no
   become: true
   tasks:
-    - name: creating integration bridge br-int (edge)
-      raw: ovs-vsctl add-port br-sfc tun0 -- set interface tun0 type=gre options:remote_ip={{ REMOTE_IP}} options:df_default=false
+    - name: creating tunnels to cloud with remote ip {{ REMOTE_IP }}
+      raw: ovs-vsctl --may-exist add-port br-sfc tun0 -- set interface tun0 type=gre options:remote_ip={{ REMOTE_IP }} options:df_default=false
 
 # Conexão entre a br-int e br-ex
 - hosts: connection_nodes
   gather_facts: no
   become: true
   tasks:
-    - name: creating integration bridge br-int (edge)
+    - name: add port int-br-ex to br-int 
       raw: ovs-vsctl --may-exist add-port br-int int-br-ex
 
 - hosts: connection_nodes
   gather_facts: no
   become: true
   tasks:
-    - name: creating integration bridge br-int (edge)
+    - name: set interface int-br-ex type=patch
       raw: ovs-vsctl set interface int-br-ex type=patch
 
 - hosts: connection_nodes
   gather_facts: no
   become: true
   tasks:
-    - name: creating integration bridge br-int (edge)
+    - name: set interface int-br-ex options=peer=ex-br-int
       raw: ovs-vsctl set interface int-br-ex options=peer=ex-br-int
 
 # Conexão entre a br-ex e br-int
@@ -83,21 +77,21 @@
   gather_facts: no
   become: true
   tasks:
-    - name: creating integration bridge br-int (edge)
+    - name: add port ex-br-int to br-ex 
       raw: ovs-vsctl --may-exist add-port br-ex ex-br-int
 
 - hosts: connection_nodes
   gather_facts: no
   become: true
   tasks:
-    - name: creating integration bridge br-int (edge)
+    - name: set interface ex-br-int type=patch
       raw: ovs-vsctl set interface ex-br-int type=patch
 
 - hosts: connection_nodes
   gather_facts: no
   become: true
   tasks:
-    - name: creating integration bridge br-int (edge)
+    - name: set interface ex-br-int options=peer=int-br-ex
       raw: ovs-vsctl set interface ex-br-int options=peer=int-br-ex
 
 # Conexão entre a br-sfc e a br-ex
@@ -105,21 +99,21 @@
   gather_facts: no
   become: true
   tasks:
-    - name: creating integration bridge br-int (edge)
-      raw: ovs-vsctl add-port br-sfc sfc-br-ex
+    - name: add port sfc-br-ex to  br-sfc 
+      raw: ovs-vsctl --may-exist add-port br-sfc sfc-br-ex
 
 - hosts: connection_nodes
   gather_facts: no
   become: true
   tasks:
-    - name: creating integration bridge br-int (edge)
+    - name: set interface sfc-br-ex type=patch
       raw: ovs-vsctl set interface sfc-br-ex type=patch
 
 - hosts: connection_nodes
   gather_facts: no
   become: true
   tasks:
-    - name: creating integration bridge br-int (edge)
+    - name: set interface sfc-br-ex options=peer=ex-br-sfc
       raw: ovs-vsctl set interface sfc-br-ex options=peer=ex-br-sfc
 
 # Conexão entre a br-ex e a br-sfc
@@ -127,72 +121,79 @@
   gather_facts: no
   become: true
   tasks:
-    - name: creating integration bridge br-int (edge)
-      raw: ovs-vsctl add-port br-ex ex-br-sfc
+    - name: --may-exist add-port ex-br-sfc to br-ex
+      raw: ovs-vsctl --may-exist add-port br-ex ex-br-sfc
 
 - hosts: connection_nodes
   gather_facts: no
   become: true
   tasks:
-    - name: creating integration bridge br-int (edge)
+    - name: set interface ex-br-sfc type=patch
       raw: ovs-vsctl set interface ex-br-sfc type=patch
 
 - hosts: connection_nodes
   gather_facts: no
   become: true
   tasks:
-    - name: creating integration bridge br-int (edge)
+    - name: set interface ex-br-sfc options=peer=sfc-br-ex
       raw: ovs-vsctl set interface ex-br-sfc options=peer=sfc-br-ex
 
 # ###############################################################
 # ### SDN Controllers
+# In order to the following commands to work, we need to replace the 
+# value ExecStart=/usr/bin/dockerd --log-opt max-file=5 --log-opt max-size=50m 
+# wit ExecStart=/usr/bin/dockerd --log-opt max-file=5 --log-opt max-size=50m  -H tcp://0.0.0.0:2375 -H unix:///var/run/docker.sock 
+# in vi /etc/systemd/system/docker.service.d/kolla.conf
+# then run systemctl daemon-reload and sudo service docker restart
 # ###############################################################
 
-# - hosts: sdn_controllers
-#   gather_facts: no
-#   tasks:
-#     - name: Create a directory if it does not exist
-#       file:
-#         path: /opt/controllers
-#         state: directory
-#         mode: '0755'
 
-#     - name: Copy controller files 
-#       copy:
-#         src: ../controllers/
-#         dest: /opt/controllers
+- hosts: sdn_controllers
+  gather_facts: no
+  tasks:
+    - name: Create a directory if it does not exist
+      file:
+        path: /opt/controllers
+        state: directory
+        mode: '0755'
 
-#     - name: Create Topology Controller
-#       docker_container:
-#         name: rodolfo_topology_controller
-#         image: rodolfo/ubuntu-source-ryu
-#         ports:
-#         - "6634:6634"
-#         - "8080:8080"
-#         command: ryu-manager ryu.app.rest_topology --observe-links --ofp-tcp-listen-port 6634 --wsapi-host 0.0.0.0 --wsapi-port 8080
+    - name: Copy controller files 
+      copy:
+        src: ../controllers/
+        dest: /opt/controllers
 
-#     - name: Create Core Controller
-#       docker_container:
-#         name: rodolfo_core_controller
-#         image: rodolfo/ubuntu-source-ryu
-#         volumes:
-#           - /opt/controllers:/opt/controllers
-#         ports:
-#         - "6635:6635"
-#         - "8081:8081"
-#         command: ryu-manager /opt/controllers/core-controller.py --ofp-tcp-listen-port 6635 --wsapi-host 0.0.0.0 --wsapi-port 8081
+    - name: Create Topology Controller
+      docker_container:
+        name: rodolfo_topology_controller
+        image: rodolfo/ubuntu-source-ryu
+        ports:
+        - "6634:6634"
+        - "8080:8080"
+        command: ryu-manager ryu.app.rest_topology --observe-links --ofp-tcp-listen-port 6634 --wsapi-host 0.0.0.0 --wsapi-port 8080
+
+    - name: Create Core Controller
+      docker_container:
+        name: rodolfo_core_controller
+        image: rodolfo/ubuntu-source-ryu
+        volumes:
+          - /opt/controllers:/opt/controllers
+        ports:
+        - "6635:6635"
+        - "8081:8081"
+        command: ryu-manager /opt/controllers/core-controller.py --ofp-tcp-listen-port 6635 --wsapi-host 0.0.0.0 --wsapi-port 8081
   
-#     - name: Create Edge Controller
-#       docker_container:
-#         name: rodolfo_edge_controller
-#         image: rodolfo/ubuntu-source-ryu
-#         volumes:
-#           - /opt/controllers:/opt/controllers
-#         ports:
-#         - "6636:6636"
-#         - "8082:8082"
-#         command: ryu-manager /opt/controllers/edge-controller.py ryu.app.ofctl_rest --ofp-tcp-listen-port 6636 --wsapi-host 0.0.0.0 --wsapi-port 8082
+    - name: Create Edge Controller
+      docker_container:
+        name: rodolfo_edge_controller
+        image: rodolfo/ubuntu-source-ryu
+        volumes:
+          - /opt/controllers:/opt/controllers
+        ports:
+        - "6636:6636"
+        - "8082:8082"
+        command: ryu-manager /opt/controllers/edge-controller.py --ofp-tcp-listen-port 6636 --wsapi-host 0.0.0.0 --wsapi-port 8082
 
+# (DEPRECATED): From now on, every external switch is a edge switch, since they have the same atributes
 #     - name: Create External Controller
 #       docker_container:
 #         name: rodolfo_external_controller
@@ -202,57 +203,69 @@
 #         ports:
 #         - "6637:6637"
 #         - "8083:8083"
-#         command: ryu-manager /opt/controllers/external-controller.py ryu.app.ofctl_rest --ofp-tcp-listen-port 6637 --wsapi-host 0.0.0.0 --wsapi-port 8083
+#         command: ryu-manager /opt/controllers/external-controller.py --ofp-tcp-listen-port 6637 --wsapi-host 0.0.0.0 --wsapi-port 8083
 
-#     - name: Create Gateway Controller
-#       docker_container:
-#         name: rodolfo_gateway_controller
-#         image: rodolfo/ubuntu-source-ryu
-#         volumes:
-#           - /opt/controllers:/opt/controllers
-#         ports:
-#         - "6638:6638"
-#         - "8084:8084"
-#         command: ryu-manager ryu.app.ofctl_rest  --ofp-tcp-listen-port 6638 --wsapi-host 0.0.0.0 --wsapi-port 8084
+    - name: Create Gateway Controller
+      docker_container:
+        name: rodolfo_gateway_controller
+        image: rodolfo/ubuntu-source-ryu
+        volumes:
+          - /opt/controllers:/opt/controllers
+        ports:
+        - "6638:6638"
+        - "8084:8084"
+        command: ryu-manager /opt/controllers/gateway-controller.py --ofp-tcp-listen-port 6638 --wsapi-host 0.0.0.0 --wsapi-port 8084
+
+    - name: Create OfCtl Controller
+      docker_container:
+        name: rodolfo_ofctl_controller
+        image: rodolfo/ubuntu-source-ryu
+        volumes:
+          - /opt/controllers:/opt/controllers
+        ports:
+        - "6639:6639"
+        - "8085:8085"
+        command: ryu-manager ryu.app.ofctl_rest --ofp-tcp-listen-port 6639 --wsapi-host 0.0.0.0 --wsapi-port 8085
        
-# - hosts: localhost
-#   gather_facts: no
-#   become: true
-#   tasks:
-#     - name: add container to inventory
-#       add_host:
-#         name: openvswitch_vswitchd_{{ item }}
-#         group: openvswitch_conteiners
-#         ansible_connection: docker
-#         ansible_host: openvswitch_vswitchd
-#         ansible_docker_extra_args: "-H=tcp://{{ item }}:2375"
-#         ansible_user: root
-#       with_items: '{{ groups.nodes }}'
+- hosts: localhost
+  gather_facts: no
+  become: true
+  tasks:
+    - name: add container to inventory
+      add_host:
+        name: openvswitch_vswitchd_{{ item }}
+        group: openvswitch_conteiners
+        ansible_connection: docker
+        ansible_host: openvswitch_vswitchd
+        ansible_docker_extra_args: "-H=tcp://{{ item }}:2375"
+        ansible_user: root
+      with_items: '{{ groups.nodes }}'
 
-# - hosts: openvswitch_conteiners, connection_nodes
-#   gather_facts: no
-#   become: true
-#   tasks:
-#     - name: setting controllers in br-ex (core)
-#       raw: ovs-vsctl set-controller br-ex tcp:127.0.0.1:6633 tcp:192.168.0.40:6634 tcp:192.168.0.40:6635
+- hosts: openvswitch_conteiners, connection_nodes
+  gather_facts: no
+  become: true
+  tasks:
+    - name: setting controllers in br-ex (core)
+      raw: ovs-vsctl set-controller br-ex {{ DEFAULT_CTRL_ENDPOINT }} {{ OFCTL_CTRL_ENDPOINT }} {{ TOPOLOGY_CTRL_ENDPOINT }} {{ CORE_CTRL_ENDPOINT }}
 
-# - hosts: openvswitch_conteiners
-#   gather_facts: no
-#   become: true
-#   tasks:
-#     - name: setting controllers in br-int (edge)
-#       raw: ovs-vsctl set-controller br-int tcp:127.0.0.1:6633 tcp:192.168.0.40:6634 tcp:192.168.0.40:6636
+- hosts: openvswitch_conteiners, connection_nodes
+  gather_facts: no
+  become: true
+  tasks:
+    - name: setting controllers in br-int (edge)
+      raw: ovs-vsctl set-controller br-int {{ DEFAULT_CTRL_ENDPOINT }} {{ OFCTL_CTRL_ENDPOINT }} {{ TOPOLOGY_CTRL_ENDPOINT }} {{ EDGE_CTRL_ENDPOINT }}
 
+- hosts: connection_nodes
+  gather_facts: no
+  become: true
+  tasks:
+    - name: setting controllers in br-sfc (gateway)
+      raw: ovs-vsctl set-controller br-sfc {{ DEFAULT_CTRL_ENDPOINT }} {{ OFCTL_CTRL_ENDPOINT }} {{ TOPOLOGY_CTRL_ENDPOINT }} {{ TUNNEL_CTRL_ENDPOINT }}
+
+# (DEPRECATED): From now on, every external switch is a edge switch, since they have the same atributes
 # - hosts: connection_nodes
 #   gather_facts: no
 #   become: true
 #   tasks:
-#     - name: setting controllers in br-sfc (gateway)
-#       raw: ovs-vsctl set-controller br-sfc tcp:127.0.0.1:6633 tcp:192.168.0.40:6634 tcp:192.168.0.40:6638
-
-# - hosts: connection_nodes
-#   gather_facts: no
-#   become: true
-#   tasks:
-#     - name: setting controllers in br-int (external)
-#       raw: ovs-vsctl set-controller br-sfc tcp:127.0.0.1:6633 tcp:192.168.0.40:6634 tcp:192.168.0.40:6637
+#     - name: setting controllers in br-external (external)
+#       raw: ovs-vsctl set-controller br-sfc {{ DEFAULT_CTRL_ENDPOINT }} {{ TOPOLOGY_CTRL_ENDPOINT }}  {{ EXTERNAL_CTRL_ENDPOINT }}

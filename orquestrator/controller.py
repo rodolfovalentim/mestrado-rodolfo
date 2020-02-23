@@ -89,17 +89,13 @@ class CoreController(Controller):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def get_keys(self):
-        pass
-
-class ExternalController(Controller):
+class EdgeController(Controller):
     discovery_path = 'discovery'
     ip2dp_path = 'ip2dp'
     switches_path = 'switches'
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.wsgi_port = kwargs.get('wsgi_port', '8080')
 
     def discover_subrede(self, ip_addr, mask):
         network = IPNetwork('/'.join([ip_addr, mask]))
@@ -132,13 +128,8 @@ class ExternalController(Controller):
 
         switch_data = response.json()
         return switch_data
-
-class EdgeController(OFCTLController):
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
  
-class GatewayController(OFCTLController):
+class GatewayController(Controller):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

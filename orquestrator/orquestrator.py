@@ -2,7 +2,7 @@
 import daiquiri
 import logging
 from collections import namedtuple
-from .nfv import FowardingGraphDomain, FowardingGraphHop, VirtualNetworkFunction
+from .nfv import DomainFowardingGraph, FowardingGraphHop, VirtualNetworkFunction
 from .switch import Flow, Link, Switch
 from pprint import pprint
 import queue
@@ -80,51 +80,59 @@ def find_switch(cloud, ip):
 
 
 def create_chain(flow_classifier, service_chain, simetric=False):
-    
-    fgds = [FowardingGraphDomain()]
+
+    fgds = [DomainFowardingGraph()]
     fgds[-1].nfvi_pop = flow_classifier["source_cloud"]
     fgds[-1].hops.append(FowardingGraphHop())
-    
-    source_switch = find_switch(flow_classifier["source_cloud"], flow_classifier["source_ip"])    
+
+    source_switch = find_switch(
+        flow_classifier["source_cloud"], flow_classifier["source_ip"])
     fgds[-1].hops[-1].src_edge_switch = source_switch
-    
+
     for vnf in service_chain:
         if fgds[-1].nfvi_pop.get_name() != vnf.get_cloud().get_name():
-            fgds.append(FowardingGraphDomain())
+            fgds.append(DomainFowardingGraph())
             fgds[-1].nfvi_pop = flow_classifier["source_cloud"]
             fgds[-1].hops.append(FowardingGraphHop())
-            
+
         target_switch = find_switch(vnf.get_cloud(), vnf.get_ip())
         fgds[-1].hops[-1].dest_vnf = vnf
         fgds[-1].hops[-1].dest_edge_switch = target_switch
         fgds[-1].hops.append(FowardingGraphHop(src_vnf=vnf))
         fgds[-1].hops[-1].src_edge_switch = target_switch
-    
-    destination_switch = find_switch(flow_classifier["destination_cloud"], flow_classifier["destination_ip"]) 
+
+    destination_switch = find_switch(
+        flow_classifier["destination_cloud"], flow_classifier["destination_ip"])
     fgds[-1].hops[-1].dest_edge_switch = destination_switch
-    
+
     for fgd in fgds:
         for hop in fgd.hops:
             if hop.src_vnf is None:
                 if fgd.prev_fgd is None:
-                    hop.set_flow_classifier(flow_classifier)
+                    hop.create_flow_classifier(flow_classifier)
                 else:
                     hop.src_gateway = fgd.nfvi_pop.get_gateway()
-                
+
             if hop.dest_vnf is None:
                 if fgd.next_fgd is None:
-                    hop.set_flow_destination()
+                    hop.create_flow_destination()
                 else:
                     hop.dest_gateway = fgd.nfvi_pop.get_gateway()
                     
-            hop.create_flows()
-            
     for fgd in fgds:
         for hop in fgd.hops:
-            logger.warn(hop)
+            hop.create_graph(fgd.domain_graph)
+
+    for fgd in fgds:
+        for hop in fgd.hops:
+            hop.create_flows()
+
+    for fgd in fgds:
+        for hop in fgd.hops:
             hop.install_flows()
-                           
-def get_switches(cloud):    
+
+
+def get_switches(cloud):
     all_switches = cloud.topology_controller.get_switches()
 
     assert all_switches is not None
@@ -163,6 +171,7 @@ def get_switches(cloud):
 
     return switches
 
+
 def get_links(cloud):
     r_links = cloud.topology_controller.get_links()
 
@@ -175,6 +184,7 @@ def get_links(cloud):
         links.append(Link(**link))
 
     return links
+
 
 def get_gateway_switch(cloud):
     all_switches = cloud.topology_controller.get_switches()
@@ -209,7 +219,6 @@ class GraphUndirectedWeighted(object):
 
     def __repr__(self):
         return "< Cloud Graph {} >".format(self.__dict__)
-        
 
     def add_edge(self, source_dpid, dest_dpid, weight):
         source = [x.dpid for x in self.switches].index(source_dpid)
@@ -225,7 +234,7 @@ class GraphUndirectedWeighted(object):
         for v in range(self.switches_count):
             yield v
 
-    def dijkstra(self, source, dest):        
+    def dijkstra(self, source, dest):
         source = [x.dpid for x in self.switches].index(source.dpid)
         dest = [x.dpid for x in self.switches].index(dest.dpid)
 
