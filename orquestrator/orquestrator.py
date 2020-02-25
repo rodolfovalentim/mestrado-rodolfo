@@ -2,7 +2,7 @@
 import daiquiri
 import logging
 from collections import namedtuple
-from .nfv import DomainFowardingGraph, FowardingGraphHop, VirtualNetworkFunction
+from .nfv import DomainForwardingGraph, ForwardingGraphHop, VirtualNetworkFunction
 from .switch import Flow, Link, Switch
 from pprint import pprint
 import queue
@@ -61,7 +61,7 @@ def find_switch(cloud, ip):
     logger.info(switch_data)
     logger.info(target_tap)
 
-    switches = get_switches(cloud)
+    switches = get_edge_switches(cloud)
 
     assert switches is not None
 
@@ -81,9 +81,11 @@ def find_switch(cloud, ip):
 
 def create_chain(flow_classifier, service_chain, simetric=False):
 
-    fgds = [DomainFowardingGraph()]
+    fgds = [DomainForwardingGraph()]
     fgds[-1].nfvi_pop = flow_classifier["source_cloud"]
-    fgds[-1].hops.append(FowardingGraphHop())
+    switches = get_all_switches(fgds[-1].nfvi_pop)
+    fgds[-1].domain_graph = GraphUndirectedWeighted(switches)
+    fgds[-1].hops.append(ForwardingGraphHop())
 
     source_switch = find_switch(
         flow_classifier["source_cloud"], flow_classifier["source_ip"])
@@ -91,20 +93,23 @@ def create_chain(flow_classifier, service_chain, simetric=False):
 
     for vnf in service_chain:
         if fgds[-1].nfvi_pop.get_name() != vnf.get_cloud().get_name():
-            fgds.append(DomainFowardingGraph())
+            logger.warning('Mudou de dominio')
+            fgds.append(DomainForwardingGraph())
             fgds[-1].nfvi_pop = flow_classifier["source_cloud"]
-            fgds[-1].hops.append(FowardingGraphHop())
+            switches = get_switches(fgds[-1].nfvi_pop)
+            fgds[-1].domain_graph = GraphUndirectedWeighted(switches)
+            fgds[-1].hops.append(ForwardingGraphHop())
 
         target_switch = find_switch(vnf.get_cloud(), vnf.get_ip())
         fgds[-1].hops[-1].dest_vnf = vnf
         fgds[-1].hops[-1].dest_edge_switch = target_switch
-        fgds[-1].hops.append(FowardingGraphHop(src_vnf=vnf))
+        fgds[-1].hops.append(ForwardingGraphHop(src_vnf=vnf))
         fgds[-1].hops[-1].src_edge_switch = target_switch
 
     destination_switch = find_switch(
         flow_classifier["destination_cloud"], flow_classifier["destination_ip"])
     fgds[-1].hops[-1].dest_edge_switch = destination_switch
-
+    
     for fgd in fgds:
         for hop in fgd.hops:
             if hop.src_vnf is None:
@@ -115,7 +120,8 @@ def create_chain(flow_classifier, service_chain, simetric=False):
 
             if hop.dest_vnf is None:
                 if fgd.next_fgd is None:
-                    hop.create_flow_destination()
+                    vm = flow_classifier["destination_cloud"].find_virtual_machine_by_ip(flow_classifier["destination_ip"])
+                    hop.create_flow_destination(vm)
                 else:
                     hop.dest_gateway = fgd.nfvi_pop.get_gateway()
                     
@@ -132,42 +138,52 @@ def create_chain(flow_classifier, service_chain, simetric=False):
             hop.install_flows()
 
 
-def get_switches(cloud):
-    all_switches = cloud.topology_controller.get_switches()
-
-    assert all_switches is not None
-
-    d_switches = {}
-
-    d_switches['edge'] = {
-        switch['dpid']: switch for switch in cloud.edge_controller.get_switches()}
-
-    d_switches['core'] = {
-        switch['dpid']: switch for switch in cloud.core_controller.get_switches()}
-
-    d_switches['external'] = {
-        switch['dpid']: switch for switch in cloud.external_controller.get_switches()}
-
-    assert d_switches['edge'] is not None
-    assert d_switches['core'] is not None
-    assert d_switches['external'] is not None
+def get_all_switches(cloud):
+    all_switches = cloud.topology_controller.get_switches()  
 
     switches = []
+    if all_switches is not None:
+        for switch in all_switches:
+            sw = cloud.core_controller.get_switches(dpid=switch['dpid'])
+            if sw is not None:
+                switches.append(Switch(**sw))
+            else:
+                switches.append(Switch(**switch))
 
-    for switch in all_switches:
-        sw = Switch(**switch)
+    return switches
 
-        if sw.dpid in d_switches['core'].keys():
-            sw.switch_type = 'core'
-            core_sw = cloud.core_controller.get_switch(sw.dpid)
-            if core_sw:
-                sw.key = core_sw.get('key')
-        elif sw.dpid in d_switches['edge'].keys():
-            sw.switch_type = 'edge'
-        elif sw.dpid in d_switches['external'].keys():
-            sw.switch_type = 'external'
+def get_edge_switches(cloud):
+    edge_switches = cloud.edge_controller.get_switches()    
 
-        switches.append(sw)
+    switches = []
+    if edge_switches is not None:
+        for edge_switch in edge_switches:
+            sw = cloud.topology_controller.get_switches(dpid=edge_switch['dpid'])[0]
+            switches.append(Switch(**sw))
+
+    return switches
+
+def get_core_switches(cloud):
+    core_switches = cloud.core_controller.get_switches()    
+
+    switches = []
+    if core_switches is not None:
+        for core_switch in core_switches:
+            sw = cloud.topology_controller.get_switches(core_switch['dpid'])[0]
+            switches.append(Switch(**sw))
+            switches[-1].key = core_switch['key']
+
+    return switches
+
+
+def get_gateway_switches(cloud):
+    gateway_switches = cloud.gateway_controller.get_switches()    
+
+    switches = []
+    if gateway_switches is not None:
+        for gateway_switch in gateway_switches:
+            sw = cloud.topology_controller.get_switches(gateway_switch['dpid'])[0]
+            switches.append(Switch(**sw))
 
     return switches
 

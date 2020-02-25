@@ -99,6 +99,6 @@ if __name__ == "__main__":
         'destination_cloud': cloud1
     }, service_chain=[dpi, nat, edge_fw1])
 
-    input("Press any key to quit...")
+    # input("Press any key to quit...")
 
-    orq.del_chain(chain)
+    # orq.del_chain(chain)

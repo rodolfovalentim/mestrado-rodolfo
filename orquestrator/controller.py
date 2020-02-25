@@ -9,14 +9,13 @@ logger = daiquiri.getLogger(__name__)
 
 class Controller(object):
 
-    switches_path = 'switches'
-    switch_path = 'switch'
-  
     def __init__(self, *args, **kwargs):
         self.endpoint = kwargs.get('endpoint', '127.0.0.1')
         self.wsgi_port = kwargs.get('wsgi_port', '8080')
         self.port = kwargs.get('port', '6633')
-    
+        self.switches_path = 'switches'
+        self.switch_path = 'switch'
+
     def get_switches(self, dpid=None):
         url = None
 
@@ -33,19 +32,18 @@ class Controller(object):
         except Exception as e:
             logger.error("Connection Error. Technical Details given below.")
             logger.error(str(e))
-            return
+            return None
 
         r_switches = response.json()
         return r_switches
 
 class OFCTLController(Controller):
-    add_flow_path = 'stats/flowentry/add'
-    del_flow_path = 'stats/flowentry/delete_strict'
-    mod_flow_path = 'stats/flowentry/modify_strict'
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.wsgi_port = kwargs.get('wsgi_port')
+        self.add_flow_path = 'stats/flowentry/add'
+        self.del_flow_path = 'stats/flowentry/delete_strict'
+        self.mod_flow_path = 'stats/flowentry/modify_strict'
 
     def add_flow(self, flow):
         url = "http://{}:{}/{}".format(self.endpoint,
@@ -63,12 +61,12 @@ class OFCTLController(Controller):
         return requests.post(url, json=flow)
 
 class TopologyController(Controller):
-    switches_path = "v1.0/topology/switches"
-    links_path = "v1.0/topology/links"
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.wsgi_port = kwargs.get('wsgi_port', '8080')
+        self.switches_path = "v1.0/topology/switches"
+        self.links_path = "v1.0/topology/links"
 
     def get_links(self):
         url = "http://{}:{}/{}".format(self.endpoint,
@@ -80,10 +78,33 @@ class TopologyController(Controller):
         except Exception as e:
             logger.error("Connection Error. Technical Details given below.")
             logger.error(str(e))
-            return
+            return None
 
         r_links = response.json()
         return r_links
+    
+    def get_switches(self, dpid=None):
+        url = None
+
+        if dpid is None:
+            url = "http://{}:{}/{}".format(self.endpoint,
+                                        self.wsgi_port, self.switches_path)
+        else:
+            url = "http://{}:{}/{}/{}".format(self.endpoint,
+                                          self.wsgi_port, self.switches_path, dpid)
+
+            logger.debug(url)
+
+        try:
+            response = requests.get(url)
+            response.raise_for_status()
+        except Exception as e:
+            logger.error("Connection Error. Technical Details given below.")
+            logger.error(str(e))
+            return None
+
+        r_switches = response.json()
+        return r_switches
 
 class CoreController(Controller):
     def __init__(self, *args, **kwargs):
@@ -124,7 +145,7 @@ class EdgeController(Controller):
         except Exception as e:
             logger.error("Connection Error. Technical Details given below.")
             logger.error(str(e))
-            return
+            return None
 
         switch_data = response.json()
         return switch_data

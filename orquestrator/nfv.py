@@ -32,7 +32,7 @@ class DomainForwardingGraph(object):
     def __repr__(self):
         return "< Fowarding Graph Domain {} >".format(self.__dict__)
         
-class FowardingGraphHop(object):
+class ForwardingGraphHop(object):
     def __init__(self, *args, **kwargs):
         self.switch_graph = kwargs.get('switch_graph', None)
         self.prev_hop = kwargs.get('prev_hop', None)
@@ -74,16 +74,16 @@ class FowardingGraphHop(object):
         elif flow_classifier['protocol'] == 'arp':
             self.flow_classifier.add_match('arp_op')
 
-    def create_flow_destination(self):
+    def create_flow_destination(self, destination):
         self.flow_destination = Flow()
-        self.flow_destination.add_action("SET_DL_DST", self.dest_vnf.ip[0].mac_address)
-        self.flow_destination.add_action("OUTPUT", self.dest_edge_switch.get_port_by_name(self.dest_vnf.ip[0].name).port_no)
+        self.flow_destination.add_action("SET_DL_DST", destination.get_mac_address())
+        self.flow_destination.add_action("OUTPUT", self.dest_edge_switch.get_port_by_name(destination.get_port()).port_no)
 
     def create_graph(self, domain_graph):
         if self.src_edge_switch != self.dest_edge_switch:
-            self.hop_id = domain_graph.dijkstra(src_edge_switch, dest_edge_switch)
+            self.hop_id = domain_graph.dijkstra(self.src_edge_switch, self.dest_edge_switch)
 
-    def create_flows(self, method):
+    def create_flows(self):
         if self.src_edge_switch == self.dest_edge_switch:
             flow = None
             if self.flow_classifier is not None:
@@ -114,8 +114,8 @@ class FowardingGraphHop(object):
                 src_flow = self.flow_classifier
             else:          
                 src_flow = Flow()
-                src_flow.add_match("dl_dst", self.prev_hop.id)
-                src_flow.add_match("in_port", in_port)
+                # src_flow.add_match("dl_dst", self.prev_hop.hop_id)
+                src_flow.add_match("in_port", self.src_vnf.get_port())
                 src_flow.add_action('OUTPUT', self.src_edge_switch.get_port_by_name("phy-br-ex"))
                 src_flow.add_action("SET_DL_DST", self.hop_id)
 
@@ -127,8 +127,8 @@ class FowardingGraphHop(object):
                 flow.add_action("SET_DL_DST", self.hop_id)
             else:
                 dest_flow = Flow()            
-                dest_port_name = self.dest_vnf.get_port()
-                output_port = self.dest_edge_switch.get_port_by_name(port_name)
+                dest_port = self.dest_vnf.get_port()
+                output_port = self.dest_edge_switch.get_port_by_name(dest_port_name.get_name())
                 dest_flow.add_match("dl_dst", self.hop_id)
                 dest_flow.add_action("OUTPUT", output_port)
 
@@ -136,4 +136,4 @@ class FowardingGraphHop(object):
 
     def install_flows(self):
        for flow in self.flows:
-           flow.install()
+           print("-->", flow)

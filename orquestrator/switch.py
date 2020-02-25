@@ -24,11 +24,11 @@ class Link(object):
 class Switch(object):
     def __init__(self, *args, **kwargs):
         self.dpid = kwargs.get('dpid', None)
-        self.ports = [Port(**port) for port in kwargs.get('ports')]
-        self.switch_type = kwargs.get('switch_type', 'default')
-
-        if (self.switch_type == 'core'):
-            self.key = kwargs.get('key', None)
+        self.key = kwargs.get('key', None)
+        self.ports = None
+        ports = kwargs.get('ports', None)
+        if ports is not None:
+            self.ports = [Port(**port) for port in ports]
 
     def __repr__(self):
         return 'Switch {}'.format(self.__dict__)
@@ -43,7 +43,7 @@ class Switch(object):
         self.ports.append(port)
 
     def set_ports(self, ports):
-        self.ports = ports
+        self.ports = [Port(**port) for port in ports]
 
     def has_port(self, name):
         for port in self.ports:
@@ -52,22 +52,14 @@ class Switch(object):
         return False
 
     def get_core_to_edge_port(self):
-        if self.switch_type == 'external':
-            f = lambda x, switch: switch.name == '{}-to-core'.format(
-                switch.dpid[-4:]) and switch or x
-        else:
-            f = lambda x, switch: switch.name == 'int-br-ex' and switch or x
+        f = lambda x, switch: switch.name == 'int-br-ex' and switch or x
         port = reduce(f, self.ports)
 
         assert port is not None
         return port.port_no
 
     def get_edge_to_core_port(self):
-        if self.switch_type == 'external':
-            f = lambda x, switch: switch.name == '{}-to-core'.format(
-                switch.dpid[-4:]) and switch or x
-        else:
-            f = lambda x, switch: switch.name == 'int-br-ex' and switch or x
+        f = lambda x, switch: switch.name == 'int-br-ex' and switch or x
         port = reduce(f, self.ports)
 
         assert port is not None
