@@ -1,10 +1,14 @@
 from functools import reduce
+import json
 
 
 class Port(object):
     def __init__(self, *args, **kwargs):
         self.dpid = kwargs.get('dpid', None)
         self.port_no = kwargs.get('port_no', None)
+        if self.port_no is not None:
+            self.port_no = int(self.port_no, 16)
+
         self.hw_addr = kwargs.get('hw_addr', None)
         self.name = kwargs.get('name', None)
 
@@ -74,38 +78,52 @@ class Switch(object):
 class Flow(object):
     def __init__(self, *args, **kwargs):
         self.switch: Switch = kwargs.get('switch', None)
-        self.table = kwargs.get('switch', None)
-        self.priority = kwargs.get('priority', 0)
+        self.table = kwargs.get('table', 0)
+        self.priority = kwargs.get('priority', 101)
         self.match = kwargs.get('match', {})
         self.actions = kwargs.get('actions', [])
 
     def __repr__(self):
-        return 'Switch {}'.format(self.__dict__)
+        return 'Flow {}'.format(self.__dict__)
 
     def get_flow(self):
         return {
-            "dpid": self.switch.dpid,
-            "table": self.table,
+            "dpid": int(self.switch.dpid, 16),
+            "table_id": self.table,
+            "cookie": 1,
             "priority": self.priority,
             "match": self.match,
             "actions": self.actions
         }
 
+    def set_match(self, match):
+        self.match = match
+
+    def set_actions(self, actions):
+        self.actions = actions
+
+    def get_match(self):
+        return self.match
+
+    def get_actions(self):
+        return self.actions
+
+
     def add_match(self, match_type, *argv):
         if match_type == 'tcp_src':
-            self.match["tcp_src"] = argv[0],
+            self.match["tcp_src"] = argv[0]
             self.match["ip_proto"] = 6
             self.match["eth_type"] = 2048
         elif match_type == 'tcp_dst':
-            self.match["tcp_dst"] = argv[0],
+            self.match["tcp_dst"] = argv[0]
             self.match["ip_proto"] = 6
             self.match["eth_type"] = 2048
         elif match_type == 'udp_src':
-            self.match["udp_src"] = argv[0],
+            self.match["udp_src"] = argv[0]
             self.match["ip_proto"] = 17
             self.match["eth_type"] = 2048
         elif match_type == 'udp_dst':
-            self.match["udp_dst"] = argv[0],
+            self.match["udp_dst"] = argv[0]
             self.match["ip_proto"] = 17
             self.match["eth_type"] = 2048
         elif match_type == 'ipv4_src':
@@ -117,13 +135,27 @@ class Flow(object):
         elif match_type == 'arp_op':
             self.match["arp_op"] = 3
             self.match["eth_type"] = 2054
+        elif match_type == "arp_spa":
+            self.match["arp_spa"] = argv[0]
+            self.match["eth_type"] = 2054
+        elif match_type == "arp_tpa":
+            self.match["arp_tpa"] = argv[0]
+            self.match["eth_type"] = 2054
+        elif match_type == "arp_tha":
+            self.match["arp_tha"] = argv[0]
+            self.match["eth_type"] = 2054
         elif match_type == 'ip_proto':
             self.match["ip_proto"] = 5
             self.match["eth_type"] = 34525
         elif match_type == 'icmpv4_type':
-            self.match["icmpv4_type"] = 5,
+            # self.match["icmpv4_type"] = 5
             self.match["ip_proto"] = 1
             self.match["eth_type"] = 2048
+        elif match_type == 'eth_dst':
+            self.match["eth_dst"] = argv[0]
+            self.match["eth_type"] = 2048
+        elif match_type == 'in_port':
+            self.match["in_port"] = argv[0]
         return self.match
 
     def add_action(self, action_type, *argv):
@@ -197,10 +229,10 @@ class Flow(object):
             # See Example of set-field action
             action = {
                 "type": "SET_FIELD",
-                "field": argv[0],     # Ex: Set VLAN_VID, VLAN_PCP, DL_SRC, DL_DST, NW_SRC, NW_DST, NW_TOS, TP_SRC, TP_DST
+                "field": argv[0],     # Ex: Set VLAN_VID, VLAN_PCP, eth_src, eth_src, ipv4_src, ipv4_dst, NW_TOS, TP_SRC, TP_DST
                 "value": argv[1]      # Describe sum of vlan_id(e.g. 6) | OFPVID_PRESENT(0x1000=4096)
             }
-            self.actions.append()
+            self.actions.append(action)
         elif action_type == 'PUSH_PBB':
             # Push a new PBB service tag with "ethertype" (Openflow1.3+)
             self.actions.append(

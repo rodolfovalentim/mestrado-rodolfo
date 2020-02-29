@@ -7,6 +7,7 @@ from requests import sessions
 daiquiri.setup(level=logging.INFO)
 logger = daiquiri.getLogger(__name__)
 
+
 class Controller(object):
 
     def __init__(self, *args, **kwargs):
@@ -21,10 +22,10 @@ class Controller(object):
 
         if dpid is None:
             url = "http://{}:{}/{}".format(self.endpoint,
-                                        self.wsgi_port, self.switches_path)
+                                           self.wsgi_port, self.switches_path)
         else:
             url = "http://{}:{}/{}/{}".format(self.endpoint,
-                                          self.wsgi_port, self.switch_path, dpid)
+                                              self.wsgi_port, self.switch_path, dpid)
 
         try:
             response = requests.get(url)
@@ -37,6 +38,7 @@ class Controller(object):
         r_switches = response.json()
         return r_switches
 
+
 class OFCTLController(Controller):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -48,6 +50,10 @@ class OFCTLController(Controller):
     def add_flow(self, flow):
         url = "http://{}:{}/{}".format(self.endpoint,
                                        self.wsgi_port, self.add_flow_path)
+
+        logger.info(url)
+        logger.info(flow)
+
         return requests.post(url, json=flow)
 
     def del_flow(self, flow):
@@ -59,6 +65,7 @@ class OFCTLController(Controller):
         url = "http://{}:{}/{}".format(self.endpoint,
                                        self.wsgi_port, self.mod_flow_path)
         return requests.post(url, json=flow)
+
 
 class TopologyController(Controller):
 
@@ -82,16 +89,16 @@ class TopologyController(Controller):
 
         r_links = response.json()
         return r_links
-    
+
     def get_switches(self, dpid=None):
         url = None
 
         if dpid is None:
             url = "http://{}:{}/{}".format(self.endpoint,
-                                        self.wsgi_port, self.switches_path)
+                                           self.wsgi_port, self.switches_path)
         else:
             url = "http://{}:{}/{}/{}".format(self.endpoint,
-                                          self.wsgi_port, self.switches_path, dpid)
+                                              self.wsgi_port, self.switches_path, dpid)
 
             logger.debug(url)
 
@@ -106,14 +113,18 @@ class TopologyController(Controller):
         r_switches = response.json()
         return r_switches
 
+
 class CoreController(Controller):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
 
 class EdgeController(Controller):
     discovery_path = 'discovery'
     ip2dp_path = 'ip2dp'
     switches_path = 'switches'
+    add_arp_flow = 'add_arp_flow'
+    del_arp_flow = 'del_arp_flow'
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -149,11 +160,35 @@ class EdgeController(Controller):
 
         switch_data = response.json()
         return switch_data
- 
+
+    def add_arp_reply(self, body):
+        url = "http://{}:{}/{}".format(self.endpoint,
+                                       self.wsgi_port,
+                                       self.add_arp_flow)
+
+        try:
+            response = requests.post(url, json=body)
+            response.raise_for_status()
+        except Exception as e:
+            logger.error("Connection Error. Technical Details given below.")
+            logger.error(str(e))
+            return None
+
+    def del_arp_reply(self, body):
+        url = "http://{}:{}/{}".format(self.endpoint,
+                                       self.wsgi_port,
+                                       self.del_arp_flow)
+
+        try:
+            response = requests.post(url, json=body)
+            response.raise_for_status()
+        except Exception as e:
+            logger.error("Connection Error. Technical Details given below.")
+            logger.error(str(e))
+            return None
+
+
 class GatewayController(Controller):
-    
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
-
-

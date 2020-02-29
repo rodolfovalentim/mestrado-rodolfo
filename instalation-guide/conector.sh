@@ -81,3 +81,5 @@ sudo ifconfig br-int-p1 up
 docker exec -u 0 rodolfo-openvswitch ovs-vsctl add-port br-int br-int-p1
 docker exec -u 0 rodolfo-openvswitch ovs-vsctl set-controller br-int tcp:127.0.0.1:6633 \
     tcp:192.168.0.40:6634 
+
+ip route del 10.80.0.0/16 dev ens3; ip route del default; ifconfig ens3 0; ovs-vsctl add-port br0 ens3; ifconfig br0 10.80.1.2/16; ip route add 10.80.0.0/16 dev br0; ip route add default via 10.80.255.254 dev br0; ifconfig br0 up; ovs-ofctl add-flow br0 "table=0, priority=0, in_port=ens3, actions=output=INPORT" --names

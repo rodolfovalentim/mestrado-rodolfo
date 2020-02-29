@@ -140,30 +140,30 @@ class RestController(ControllerBase):
     def add_arp_flow(self, req, **kwargs):
         datapath = None
         switches = get_switch(self.edge_app, None)
+        print(switches)
         for switch in switches:
-            if str(switch.dp.id) == req.json.get('dpid'):
+            if str(switch.dp.id) == str(req.json.get('dpid')):
                 datapath = switch.dp
-                self._add_arp_reply_flow(datapath, in_port=req.json.get('in_port'),
-                     arp_tpa=req.json.get('arp_tpa'), arp_tha=req.json.get('arp_tha'))
-                
+                self._add_arp_reply_flow(datapath, in_port=req.json.get('match').get('in_port'),
+                     arp_tpa=req.json.get('match').get('arp_tpa'), arp_tha=req.json.get('match').get('arp_tha'))
 
     @route('nodes', '/del_arp_flow', methods=['POST'])
     def del_arp_flow(self, req, **kwargs):
         datapath = None
         switches = get_switch(self.edge_app, None)
         for switch in switches:
-            if str(switch.dp.id) == req.json.get('dpid'):
+            if str(switch.dp.id) == str(req.json.get('dpid')):
                 datapath = switch.dp
                 self._del_arp_reply_flow(datapath,
-                     in_port=req.json.get('in_port'),
-                     arp_tpa=req.json.get('arp_tpa'))
+                     in_port=req.json.get('match').get('in_port'),
+                     arp_tpa=req.json.get('match').get('arp_tpa'))
 
     def _add_arp_reply_flow(self, datapath, in_port, arp_tpa, arp_tha):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
 
         match = parser.OFPMatch(
-            in_port=int(in_port),
+            in_port=int(in_port),   
             eth_type=ether_types.ETH_TYPE_ARP,
             arp_op=arp.ARP_REQUEST,
             arp_tpa=arp_tpa)
@@ -234,9 +234,11 @@ class RestController(ControllerBase):
     # Example of a request to add and delete an arp reply flow
     # {
     # 	"dpid": "1",
-    # 	"in_port": "1",
-    # 	"arp_tpa": "10.0.0.2",
-    # 	"arp_tha": "90:01:02:AB:03:02"
+    #   "match": {
+    #       "in_port": "1",
+    # 	    "arp_tpa": "10.0.0.2",
+    # 	    "arp_tha": "90:01:02:AB:03:02"
+    #   }
     # }
 
     @route('discovery', '/discovery/{ip}', methods=['GET'])

@@ -40,12 +40,16 @@ if __name__ == "__main__":
     cloud1.set_core_controller(core_ctrl_n1)
     cloud1.set_edge_controller(edge_ctrl_n1)
     cloud1.set_gateway_controller(gw_ctrl_n1)
+    cloud1.set_ofctl_controller(ofctl_ctrl_n1)
+    cloud1.set_tunnel_interface_name('tun0')
 
     cloud2 = Cloud(name='nuvem02')
     cloud2.set_topology_controller(topo_ctrl_n2)
     cloud2.set_core_controller(core_ctrl_n2)
     cloud2.set_edge_controller(edge_ctrl_n2)
     cloud2.set_gateway_controller(gw_ctrl_n2)
+    cloud2.set_ofctl_controller(ofctl_ctrl_n2)
+    cloud2.set_tunnel_interface_name('tun0')
 
     src = orq.create_virtual_function(cloud=cloud1,
                                       name='src',
@@ -89,16 +93,27 @@ if __name__ == "__main__":
     # caso nao sejam encontrados elementos com os ips de origem e destino, o fluxo sera assinalado como externa a rede
     # e por isso implementados nos switches externos
 
-    chain = orq.create_chain(flow_classifier={
+    chain1 = orq.create_chain(flow_classifier={
         'source_ip': '10.80.1.17',
-        'source_port': 80,
+        # 'source_port': 80,
         'source_cloud': cloud1,
         'destination_ip': '10.80.1.7',
-        'destination_port': 80,
-        'protocol': 'udp',
+        # 'destination_port': 80,
+        'protocol': 'icmp',
         'destination_cloud': cloud1
     }, service_chain=[dpi, nat, edge_fw1])
 
-    # input("Press any key to quit...")
+    chain2 = orq.create_chain(flow_classifier={
+        'source_ip': '10.80.1.7',
+        # 'source_port': 80,
+        'source_cloud': cloud1,
+        'destination_ip': '10.80.1.17',
+        # 'destination_port': 80,
+        'protocol': 'icmp',
+        'destination_cloud': cloud1
+    }, service_chain=[])
 
-    # orq.del_chain(chain)
+    input("Press any key to quit...")
+
+    orq.del_chain(chain1)
+    orq.del_chain(chain2)

@@ -19,8 +19,8 @@ class VirtualMachine(object):
     def add_tap(self, tap):
         self.taps.append(tap)
 
-    def get_port(self):
-        return self.taps[0].name
+    def get_tap(self):
+        return self.taps[0]
 
     def get_ip(self):
         self.taps[0].get_ip()
@@ -45,6 +45,9 @@ class Tap(object):
     def get_ip(self):
         return self.ip
 
+    def get_name(self):
+        return self.name
+
     def get_mac_address(self):
         return self.mac_address
 
@@ -63,6 +66,12 @@ class Cloud(object):
 
     def set_gateway_controller(self, controller):
         self.gateway_controller = controller
+
+    def set_ofctl_controller(self, controller):
+        self.ofctl_controller = controller
+
+    def set_tunnel_interface_name(self, name):
+        self.tunnel_interface_name = name
 
     def get_name(self):
         return self.name
