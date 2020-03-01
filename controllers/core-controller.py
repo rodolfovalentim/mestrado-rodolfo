@@ -141,7 +141,7 @@ class CoreController(app_manager.RyuApp):
         match = parser.OFPMatch(
             in_port=port, eth_dst=(pkt_keyflow.dst))
 
-        route_key = self.mac_to_int(pkt_keyflow.dst[0:11])
+        route_key = self.mac_to_int(pkt_keyflow.dst[3:11])  
         switch_key = self.dpid_to_key[datapath.id]
         output_port = route_key % switch_key
 
@@ -181,7 +181,7 @@ class CoreController(app_manager.RyuApp):
 
     def mac_to_int(self, mac):
         res = re.match(
-            '^((?:(?:[0-9a-f]{2}):){3}[0-9a-f]{2})$', mac.lower())
+            '^((?:(?:[0-9a-f]{2}):){2}[0-9a-f]{2})$', mac.lower())
         if res is None:
             raise ValueError('invalid mac address')
         return int(res.group(0).replace(':', ''), 16)

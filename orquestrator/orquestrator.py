@@ -97,42 +97,41 @@ def create_chain(flow_classifier, service_chain, simetric=False):
         if fgds[-1].nfvi_pop.get_name() != vnf.get_cloud().get_name():
             fgds.append(DomainForwardingGraph(prev_fgd=fgds[-1]))
             fgds[-1].prev_fgd.next_fgd = fgds[-1]
-            fgds[-1].nfvi_pop = flow_classifier["source_cloud"]
+            fgds[-1].nfvi_pop = vnf.get_cloud()
             fgds[-1].domain_graph = create_domain_graph(fgds[-1].nfvi_pop)
-            fgds[-1].hops.append(ForwardingGraphHop(prev_hop=fgds[-1].hops[-1]))
-            fgds[-1].hops[-1].prev_hop.next_hop = fgds[-1].hops[-1]  
+            fgds[-1].hops.append(ForwardingGraphHop(src_tap=fgds[-1].prev_fgd.hops[-1].dest_tap, prev_hop=fgds[-1].prev_fgd.hops[-1]))
+            fgds[-1].hops[-1].prev_hop.next_hop = fgds[-1].prev_fgd.hops[-1]  
             
         target_switch = find_switch(vnf.get_cloud(), vnf.get_ip())
         fgds[-1].hops[-1].dest_tap = vnf.get_tap()
         fgds[-1].hops[-1].dest_switch = target_switch
-        fgds[-1].hops.append(ForwardingGraphHop(src_tap=vnf.get_tap(), prev_hop=fgds[-1].hops[-1]))
-        fgds[-1].hops[-1].prev_hop.next_hop = fgds[-1].hops[-1]     
+        fgds[-1].hops.append(ForwardingGraphHop(src_tap=fgds[-1].hops[-1].dest_tap, prev_hop=fgds[-1].hops[-1]))
+        fgds[-1].hops[-1].prev_hop.next_hop = fgds[-1].hops[-1]
         fgds[-1].hops[-1].src_switch = target_switch
+
+    if fgds[-1].nfvi_pop.get_name() != flow_classifier["destination_cloud"].get_name():
+        fgds.append(DomainForwardingGraph(prev_fgd=fgds[-1]))
+        fgds[-1].prev_fgd.next_fgd = fgds[-1]
+        fgds[-1].nfvi_pop = flow_classifier["destination_cloud"]
+        fgds[-1].domain_graph = create_domain_graph(fgds[-1].nfvi_pop)
+        fgds[-1].hops.append(ForwardingGraphHop(src_tap=fgds[-1].prev_fgd.hops[-1].dest_tap, prev_hop=fgds[-1].prev_fgd.hops[-1]))
+        fgds[-1].hops[-1].prev_hop.next_hop = fgds[-1].prev_fgd.hops[-1]  
 
     dest_switch = find_switch(flow_classifier["destination_cloud"], flow_classifier["destination_ip"])
     dest_vm = flow_classifier["destination_cloud"].find_virtual_machine_by_ip(flow_classifier["destination_ip"])
     fgds[-1].hops[-1].dest_tap = dest_vm.get_tap()
     fgds[-1].hops[-1].dest_switch = dest_switch
-   
+
     for fgd in fgds:
         for hop in fgd.hops:
             hop.create_flow_classifier(flow_classifier)
-            if hop.src_vnf is None and fgd.prev_fgd is not None:
-                if fgd.prev_fgd is None:
-                    hop.create_flow_classifier(flow_classifier)
-                    hop.hop_type.first_hop = True
-                else:
-                    hop.src_switch = fgd.nfvi_pop.get_gateway()
-                    hop.hop_type.from_gateway = True 
+            if hop.src_tap is None and fgd.prev_fgd is not None:
+                hop.src_switch = fgd.nfvi_pop.get_gateway()
+                hop.hop_type.from_gateway = True 
 
-            if hop.dest_vnf is None:
-                if fgd.next_fgd is None:
-                    vm = flow_classifier["destination_cloud"].find_virtual_machine_by_ip(flow_classifier["destination_ip"])
-                    hop.create_flow_destination(vm)
-                    hop.hop_type.last_hop = True
-                else:
-                    hop.dest_switch = fgd.nfvi_pop.get_gateway()
-                    hop.hop_type.to_gateway = True
+            if hop.dest_tap is None and fgd.next_fgd is not None:
+                hop.dest_switch = fgd.nfvi_pop.get_gateway()
+                hop.hop_type.to_gateway = True
 
             if hop.src_switch.dpid == hop.dest_switch.dpid:
                 hop.hop_type.same_host = True
@@ -145,6 +144,7 @@ def create_chain(flow_classifier, service_chain, simetric=False):
             hop.get_keyflow_data(adjmatrix)
             key = KeyFlow.chinese_remainder(hop.keys, hop.ports)
             hop.hop_id = KeyFlow.encode(key)
+            logging.warning(hop.hop_id)
 
     for fgd in fgds:
         for hop in fgd.hops:
@@ -156,16 +156,18 @@ def create_chain(flow_classifier, service_chain, simetric=False):
         if fgd.prev_fgd is None:
             fgd.create_arp(src_vm, dst_vm)
         
+        # TODO: Tem que remover essa parte pq a volta deve ser uma nova chain
         if fgd.next_fgd is None:
             fgd.create_arp(dst_vm, src_vm)
 
     for fgd in fgds:
         for hop in fgd.hops:
+            logger.warning(hop.hop_type.same_host)
             for flow in hop.flows:
-                print(flow.get_flow())
-                print(fgd.nfvi_pop.ofctl_controller.add_flow(flow.get_flow()))
+                logger.info(flow.get_flow())
+                fgd.nfvi_pop.ofctl_controller.add_flow(flow.get_flow())
         for flow in fgd.arp_flows:
-            print(flow.get_flow())
+            logger.info(flow.get_flow())
             fgd.nfvi_pop.edge_controller.add_arp_reply(flow.get_flow())
     
     return fgds

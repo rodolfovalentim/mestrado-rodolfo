@@ -76,10 +76,10 @@ class ForwardingGraphHop(object):
 
         self.flows = kwargs.get('flows', [])
 
-        self.src_tap = kwargs.get('src_', None)
+        self.src_tap = kwargs.get('src_tap', None)
         self.src_switch = kwargs.get('src_switch', None)
         
-        self.dest_tap = kwargs.get('dest_', None)
+        self.dest_tap = kwargs.get('dest_tap', None)
         self.dest_switch = kwargs.get('dest_switch', None)
         
         self.keys = []
@@ -122,22 +122,28 @@ class ForwardingGraphHop(object):
 
     def create_graph(self, domain_graph):
         if self.src_switch.dpid != self.dest_switch.dpid:
-            self.switch_graph = domain_graph.dijkstra(self.src_switch, self.dest_switch)[1:-1]
+            self.switch_graph = domain_graph.dijkstra(self.src_switch, self.dest_switch)[1:]
  
     def get_keyflow_data(self, adjmatrix):
         if self.switch_graph is None:
             return
             
+        logging.warning('Keyflow')
+        logging.warning(self.switch_graph)
         hops = zip(self.switch_graph[0:-1], self.switch_graph[1:]) 
         for hop in hops:
-            self.keys.append(int(hop[0].key))       
+            logging.warning(int(hop[0].key))
+            logging.warning(hop[0].dpid)
+            logging.warning(hop[1].dpid)
+            logging.warning(int(adjmatrix.get(hop[0].dpid, hop[1].dpid).port_no))
+            self.keys.append(int(hop[0].key))
             self.ports.append(int(adjmatrix.get(hop[0].dpid, hop[1].dpid).port_no))
 
     def create_flow(self):
         self.flows = [Flow()]
         self.flows[0].switch = self.src_switch
         self.flows[0].set_match(self.flow_classifier.get_match())
-        self.flows[0].add_match('in_port', self.src_switch.get_port_by_name(self.source_tap.get_name()).port_no)
+        self.flows[0].add_match('in_port', self.src_switch.get_port_by_name(self.src_tap.get_name()).port_no)
         
         if self.hop_type.same_host:
             self.flows[0].add_action("SET_FIELD", "eth_dst", self.dest_tap.get_mac_address())
@@ -145,15 +151,15 @@ class ForwardingGraphHop(object):
             return
         
         self.flows[0].add_action("SET_FIELD", "eth_dst", self.hop_id)
-        self.flows[0].add_action("OUTPUT", self.flows[0].get_edge_to_core_port())
+        self.flows[0].add_action("OUTPUT", self.flows[0].switch.get_edge_to_core_port())
         
-        self.flows = [Flow()]
+        self.flows += [Flow()]
         self.flows[-1].switch = self.dest_switch
-        self.flows[-1].add_match('in_port', self.flows[-1].get_core_to_edge_port())
+        self.flows[-1].add_match('in_port', self.flows[-1].switch.get_core_to_edge_port())
         self.flows[-1].add_match('eth_dst', self.hop_id)
 
         self.flows[-1].add_action("SET_FIELD", "eth_dst", self.dest_tap.get_mac_address())
-        self.flows[-1].add_action("OUTPUT", self.flows[-1].switch.get_port_by_name(self.dest_tap.get_tap().get_name()).port_no)        
+        self.flows[-1].add_action("OUTPUT", self.flows[-1].switch.get_port_by_name(self.dest_tap.get_name()).port_no)        
 
 class HopClassification(object):
     def __init__(self):
@@ -175,9 +181,9 @@ class AdjacencyMatrix(object):
         super().__init__()
         for link in links:
             if self.matrix.get(link.port_src.dpid) is None:
-                self.matrix[link.port_src.dpid] = { link.port_dst.dpid: link.port_dst }
+                self.matrix[link.port_src.dpid] = { link.port_dst.dpid: link.port_src }
             else:
-                self.matrix[link.port_src.dpid][link.port_dst.dpid] = link.port_dst 
+                self.matrix[link.port_src.dpid][link.port_dst.dpid] = link.port_src 
 
     def get(self, src, dst):
         return self.matrix.get(src).get(dst)
