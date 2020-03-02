@@ -128,14 +128,8 @@ class ForwardingGraphHop(object):
         if self.switch_graph is None:
             return
             
-        logging.warning('Keyflow')
-        logging.warning(self.switch_graph)
         hops = zip(self.switch_graph[0:-1], self.switch_graph[1:]) 
         for hop in hops:
-            logging.warning(int(hop[0].key))
-            logging.warning(hop[0].dpid)
-            logging.warning(hop[1].dpid)
-            logging.warning(int(adjmatrix.get(hop[0].dpid, hop[1].dpid).port_no))
             self.keys.append(int(hop[0].key))
             self.ports.append(int(adjmatrix.get(hop[0].dpid, hop[1].dpid).port_no))
 
@@ -143,7 +137,11 @@ class ForwardingGraphHop(object):
         self.flows = [Flow()]
         self.flows[0].switch = self.src_switch
         self.flows[0].set_match(self.flow_classifier.get_match())
-        self.flows[0].add_match('in_port', self.src_switch.get_port_by_name(self.src_tap.get_name()).port_no)
+
+        if self.hop_type.from_gateway:
+            self.flows[0].add_match('in_port', self.flows[0].switch.get_port_by_name("tun0").port_no)
+        else:
+            self.flows[0].add_match('in_port', self.flows[0].switch.get_port_by_name(self.src_tap.get_name()).port_no)
         
         if self.hop_type.same_host:
             self.flows[0].add_action("SET_FIELD", "eth_dst", self.dest_tap.get_mac_address())
@@ -159,7 +157,11 @@ class ForwardingGraphHop(object):
         self.flows[-1].add_match('eth_dst', self.hop_id)
 
         self.flows[-1].add_action("SET_FIELD", "eth_dst", self.dest_tap.get_mac_address())
-        self.flows[-1].add_action("OUTPUT", self.flows[-1].switch.get_port_by_name(self.dest_tap.get_name()).port_no)        
+
+        if self.hop_type.to_gateway:
+            self.flows[-1].add_action("OUTPUT", self.flows[-1].switch.get_port_by_name("tun0").port_no)
+        else:
+            self.flows[-1].add_action("OUTPUT", self.flows[-1].switch.get_port_by_name(self.dest_tap.get_name()).port_no)
 
 class HopClassification(object):
     def __init__(self):

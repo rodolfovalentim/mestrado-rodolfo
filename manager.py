@@ -97,10 +97,10 @@ if __name__ == "__main__":
         'source_ip': '10.80.1.17',
         # 'source_port': 80,
         'source_cloud': cloud1,
-        'destination_ip': '10.80.1.7',
+        'destination_ip': '10.83.1.15',
         # 'destination_port': 80,
         'protocol': 'icmp',
-        'destination_cloud': cloud1
+        'destination_cloud': cloud2
     }, service_chain=[dpi, nat, edge_fw1])
 
     # chain2 = orq.create_chain(flow_classifier={

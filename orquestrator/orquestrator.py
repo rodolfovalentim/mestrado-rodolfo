@@ -165,10 +165,10 @@ def create_chain(flow_classifier, service_chain, simetric=False):
             logger.warning(hop.hop_type.same_host)
             for flow in hop.flows:
                 logger.info(flow.get_flow())
-                fgd.nfvi_pop.ofctl_controller.add_flow(flow.get_flow())
+                # fgd.nfvi_pop.ofctl_controller.add_flow(flow.get_flow())
         for flow in fgd.arp_flows:
             logger.info(flow.get_flow())
-            fgd.nfvi_pop.edge_controller.add_arp_reply(flow.get_flow())
+            # fgd.nfvi_pop.edge_controller.add_arp_reply(flow.get_flow())
     
     return fgds
 
