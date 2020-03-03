@@ -67,10 +67,7 @@ class RestController(ControllerBase):
             if str(switch.dp.id) == str(req.json.get('dpid')):
                 print(switch.dp)
                 datapath = switch.dp
-                if len(req.json.get('actions')) > 1:
-                    self._add_output_flow(datapath, match=req.json.get('match'), new_eth_dst=req.json.get('actions')[0].get('value'), out_port=req.json.get('actions')[-1].get('port'))
-                else: 
-                    self._add_output_flow(datapath, match=req.json.get('match'), out_port=req.json.get('actions')[-1].get('port'))
+                self._add_output_flow(datapath, match=req.json.get('match'), actions=req.json.get('actions'))
                     
 
     @route('nodes', '/stats/flowentry/delete_strict', methods=['POST'])
@@ -82,21 +79,24 @@ class RestController(ControllerBase):
                 datapath = switch.dp
                 self._del_output_flow(datapath, match=req.json.get('match'))
 
-    def _add_output_flow(self, datapath, match, out_port, new_eth_dst=None):
+    def _add_output_flow(self, datapath, match, actions):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
 
         match = parser.OFPMatch(**match)
 
-        actions = []
-        if new_eth_dst is not None:
-            actions += [parser.OFPActionSetField(eth_dst=new_eth_dst)]
-            
-        actions += [parser.OFPActionOutput(int(out_port))]
-    
+        new_actions = []
+
+        for action in actions:
+            action_type = action.pop('type')
+            if action_type == "OUTPUT":
+                new_actions += [parser.OFPActionOutput(**action)]
+            elif action_type == "SET_FIELD":
+                new_actions += [parser.OFPActionSetField(**{action.get('field'): action.get('value')})]
+
         instructions = [
             parser.OFPInstructionActions(
-                ofproto.OFPIT_APPLY_ACTIONS, actions)]
+                ofproto.OFPIT_APPLY_ACTIONS, new_actions)]
 
         self._add_flow(datapath, PRIORITY_FLOW_REPLY, match, instructions)
 

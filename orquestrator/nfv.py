@@ -138,7 +138,7 @@ class ForwardingGraphHop(object):
         self.flows[0].switch = self.src_switch
         self.flows[0].set_match(self.flow_classifier.get_match())
 
-        if self.hop_type.from_gateway:        
+        if self.hop_type.from_gateway:
             self.flows[0].add_match('in_port', self.flows[0].switch.get_port_by_name("tun0").port_no)
             self.flows[0].add_action("SET_FIELD", "eth_dst", self.hop_id)
             self.flows[0].add_action("OUTPUT", self.flows[0].switch.get_port_by_name("sfc-br-ex").port_no)
@@ -155,14 +155,14 @@ class ForwardingGraphHop(object):
         
         self.flows += [Flow()]
         self.flows[-1].switch = self.dest_switch
+        self.flows[-1].add_match('eth_dst', self.hop_id)
 
         if self.hop_type.to_gateway:
             self.flows[-1].add_match('in_port', self.flows[-1].switch.get_port_by_name("sfc-br-ex").port_no)
-            # self.flows[-1].add_action("SET_FIELD", "eth_dst", self.dest_tap.get_mac_address())
             self.flows[-1].add_action("OUTPUT", self.flows[-1].switch.get_port_by_name("tun0").port_no)
         else:
             self.flows[-1].add_match('in_port', self.flows[-1].switch.get_core_to_edge_port())
-            self.flows[-1].add_match('eth_dst', self.hop_id)
+            # self.flows[-1].add_match('eth_dst', self.hop_id)
             self.flows[-1].add_action("SET_FIELD", "eth_dst", self.dest_tap.get_mac_address())
             self.flows[-1].add_action("OUTPUT", self.flows[-1].switch.get_port_by_name(self.dest_tap.get_name()).port_no)
 
