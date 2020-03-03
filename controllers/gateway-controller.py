@@ -13,6 +13,7 @@ from ryu.ofproto import (ether, inet, ofproto_v1_0, ofproto_v1_2, ofproto_v1_3,
                          ofproto_v1_4, ofproto_v1_5)
 from ryu.topology.api import get_switch
 from webob import Response
+from ryu.ofproto.ofproto_v1_5_parser import OFPActionSetField
 
 LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.DEBUG)
@@ -23,6 +24,9 @@ LOG.setLevel(logging.DEBUG)
 logging.basicConfig()
 
 gateway_instance_name = 'gateway_api_app'
+PRIORITY_FLOW_REPLY = 101
+TABLE_ID_EGRESS = 0
+TABLE_ID_INGRESS = 0 
 
 
 class TunnelController(app_manager.RyuApp):
@@ -41,7 +45,6 @@ class TunnelController(app_manager.RyuApp):
         wsgi = kwargs['wsgi']
         wsgi.register(RestController, {gateway_instance_name: self})
 
-
 class RestController(ControllerBase):
     def __init__(self, req, link, data, **config):
         super(RestController, self).__init__(req, link, data, **config)
@@ -54,3 +57,83 @@ class RestController(ControllerBase):
                  'ip': switch.dp.socket.getpeername()[0]
                  } for switch in switches]
         return Response(content_type='application/json', json=body)
+
+    @route('nodes', '/stats/flowentry/add', methods=['POST'])
+    def add_flow(self, req, **kwargs):
+        datapath = None
+        switches = get_switch(self.gateway_app, None)
+        for switch in switches:
+            print(switch.dp.id, req.json.get('dpid'))
+            if str(switch.dp.id) == str(req.json.get('dpid')):
+                print(switch.dp)
+                datapath = switch.dp
+                if len(req.json.get('actions')) > 1:
+                    self._add_output_flow(datapath, match=req.json.get('match'), new_eth_dst=req.json.get('actions')[0].get('value'), out_port=req.json.get('actions')[-1].get('port'))
+                else: 
+                    self._add_output_flow(datapath, match=req.json.get('match'), out_port=req.json.get('actions')[-1].get('port'))
+                    
+
+    @route('nodes', '/stats/flowentry/delete_strict', methods=['POST'])
+    def del_flow(self, req, **kwargs):
+        datapath = None
+        switches = get_switch(self.gateway_app, None)
+        for switch in switches:
+            if str(switch.dp.id) == str(req.json.get('dpid')):
+                datapath = switch.dp
+                self._del_output_flow(datapath, match=req.json.get('match'))
+
+    def _add_output_flow(self, datapath, match, out_port, new_eth_dst=None):
+        ofproto = datapath.ofproto
+        parser = datapath.ofproto_parser
+
+        match = parser.OFPMatch(**match)
+
+        actions = []
+        if new_eth_dst is not None:
+            actions += [parser.OFPActionSetField(eth_dst=new_eth_dst)]
+            
+        actions += [parser.OFPActionOutput(int(out_port))]
+    
+        instructions = [
+            parser.OFPInstructionActions(
+                ofproto.OFPIT_APPLY_ACTIONS, actions)]
+
+        self._add_flow(datapath, PRIORITY_FLOW_REPLY, match, instructions)
+
+      
+    def _del_output_flow(self, datapath, match):
+        parser = datapath.ofproto_parser
+
+        match = parser.OFPMatch(**match)
+
+        self._del_flow(datapath, PRIORITY_FLOW_REPLY, match)
+
+    @staticmethod
+    def _add_flow(datapath, priority, match, instructions,
+                table_id=TABLE_ID_INGRESS):
+        parser = datapath.ofproto_parser
+
+        mod = parser.OFPFlowMod(
+            datapath=datapath,
+            table_id=table_id,
+            priority=priority,
+            match=match,
+            instructions=instructions)
+
+        datapath.send_msg(mod)
+
+    @staticmethod
+    def _del_flow(datapath, priority, match, table_id=TABLE_ID_INGRESS):
+        ofproto = datapath.ofproto
+        parser = datapath.ofproto_parser
+
+        mod = parser.OFPFlowMod(
+            datapath=datapath,
+            table_id=table_id,
+            command=ofproto.OFPFC_DELETE,
+            priority=priority,
+            out_port=ofproto.OFPP_ANY,
+            out_group=ofproto.OFPG_ANY,
+            match=match)
+
+        datapath.send_msg(mod)

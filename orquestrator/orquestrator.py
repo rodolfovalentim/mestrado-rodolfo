@@ -126,11 +126,11 @@ def create_chain(flow_classifier, service_chain, simetric=False):
         for hop in fgd.hops:
             hop.create_flow_classifier(flow_classifier)
             if hop.src_tap is None and fgd.prev_fgd is not None:
-                hop.src_switch = fgd.nfvi_pop.get_gateway()
+                hop.src_switch = get_gateway_switches(fgd.nfvi_pop)[0]
                 hop.hop_type.from_gateway = True 
 
             if hop.dest_tap is None and fgd.next_fgd is not None:
-                hop.dest_switch = fgd.nfvi_pop.get_gateway()
+                hop.dest_switch = get_gateway_switches(fgd.nfvi_pop)[0]
                 hop.hop_type.to_gateway = True
 
             if hop.src_switch.dpid == hop.dest_switch.dpid:
@@ -157,18 +157,30 @@ def create_chain(flow_classifier, service_chain, simetric=False):
             fgd.create_arp(src_vm, dst_vm)
         
         # TODO: Tem que remover essa parte pq a volta deve ser uma nova chain
-        if fgd.next_fgd is None:
-            fgd.create_arp(dst_vm, src_vm)
+        # if fgd.next_fgd is None:
+            # fgd.create_arp(dst_vm, src_vm)
 
     for fgd in fgds:
         for hop in fgd.hops:
-            logger.warning(hop.hop_type.same_host)
-            for flow in hop.flows:
-                logger.info(flow.get_flow())
-                # fgd.nfvi_pop.ofctl_controller.add_flow(flow.get_flow())
+            logger.warning(hop.hop_type)
+            if hop.hop_type.from_gateway or hop.hop_type.to_gateway:
+                if hop.hop_type.from_gateway:
+                    fgd.nfvi_pop.gateway_controller.add_flow(hop.flows[0].get_flow())
+                else:
+                    fgd.nfvi_pop.ofctl_controller.add_flow(hop.flows[0].get_flow())
+
+                if hop.hop_type.to_gateway:
+                    fgd.nfvi_pop.gateway_controller.add_flow(hop.flows[-1].get_flow())
+                else:
+                    fgd.nfvi_pop.ofctl_controller.add_flow(hop.flows[-1].get_flow())
+            else:
+                for flow in hop.flows:
+                    logger.info(flow.get_flow())
+                    fgd.nfvi_pop.ofctl_controller.add_flow(flow.get_flow())
+
         for flow in fgd.arp_flows:
             logger.info(flow.get_flow())
-            # fgd.nfvi_pop.edge_controller.add_arp_reply(flow.get_flow())
+            fgd.nfvi_pop.edge_controller.add_arp_reply(flow.get_flow())
     
     return fgds
 

@@ -192,3 +192,24 @@ class GatewayController(Controller):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.wsgi_port = kwargs.get('wsgi_port')
+        self.add_flow_path = 'stats/flowentry/add'
+        self.del_flow_path = 'stats/flowentry/delete_strict'
+
+    def add_flow(self, flow):
+        url = "http://{}:{}/{}".format(self.endpoint,
+                                       self.wsgi_port, self.add_flow_path)
+
+        logger.info(url)
+        logger.info(flow)
+
+        return requests.post(url, json=flow)
+
+    def del_flow(self, flow):
+        url = "http://{}:{}/{}".format(self.endpoint,
+                                       self.wsgi_port, self.del_flow_path)
+
+        logger.info(url)
+        logger.info(flow)
+
+        return requests.post(url, json=flow)

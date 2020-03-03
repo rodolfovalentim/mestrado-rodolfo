@@ -151,6 +151,3 @@ class Cloud(object):
                 logger.warning(vm)
                 return(vm)
         return None
-
-    def get_gateway(self):
-        return self.gateway_controller.get_switches()[0]

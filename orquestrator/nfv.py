@@ -57,7 +57,7 @@ class DomainForwardingGraph(object):
     def create_arp(self, src_vm, dst_vm):
         self.arp_flows.append(Flow())
         self.arp_flows[-1].switch = self.hops[0].src_switch
-        src_port_no = self.hops[0].dest_switch.get_port_by_name(src_vm.get_tap().get_name()).port_no
+        src_port_no = self.hops[0].src_switch.get_port_by_name(src_vm.get_tap().get_name()).port_no
         self.arp_flows[-1].add_match("in_port", src_port_no)
         self.arp_flows[-1].add_match("arp_tpa", dst_vm.get_tap().get_ip())
         self.arp_flows[-1].add_match("arp_tha", dst_vm.get_tap().get_mac_address())
@@ -138,29 +138,32 @@ class ForwardingGraphHop(object):
         self.flows[0].switch = self.src_switch
         self.flows[0].set_match(self.flow_classifier.get_match())
 
-        if self.hop_type.from_gateway:
+        if self.hop_type.from_gateway:        
             self.flows[0].add_match('in_port', self.flows[0].switch.get_port_by_name("tun0").port_no)
+            self.flows[0].add_action("SET_FIELD", "eth_dst", self.hop_id)
+            self.flows[0].add_action("OUTPUT", self.flows[0].switch.get_port_by_name("sfc-br-ex").port_no)
         else:
             self.flows[0].add_match('in_port', self.flows[0].switch.get_port_by_name(self.src_tap.get_name()).port_no)
+            
+            if self.hop_type.same_host:
+                self.flows[0].add_action("SET_FIELD", "eth_dst", self.dest_tap.get_mac_address())
+                self.flows[0].add_action("OUTPUT", self.flows[0].switch.get_port_by_name(self.dest_tap.get_name()).port_no)
+                return
         
-        if self.hop_type.same_host:
-            self.flows[0].add_action("SET_FIELD", "eth_dst", self.dest_tap.get_mac_address())
-            self.flows[0].add_action("OUTPUT", self.flows[0].switch.get_port_by_name(self.dest_tap.get_name()).port_no)
-            return
-        
-        self.flows[0].add_action("SET_FIELD", "eth_dst", self.hop_id)
-        self.flows[0].add_action("OUTPUT", self.flows[0].switch.get_edge_to_core_port())
+            self.flows[0].add_action("SET_FIELD", "eth_dst", self.hop_id)
+            self.flows[0].add_action("OUTPUT", self.flows[0].switch.get_edge_to_core_port())
         
         self.flows += [Flow()]
         self.flows[-1].switch = self.dest_switch
-        self.flows[-1].add_match('in_port', self.flows[-1].switch.get_core_to_edge_port())
-        self.flows[-1].add_match('eth_dst', self.hop_id)
-
-        self.flows[-1].add_action("SET_FIELD", "eth_dst", self.dest_tap.get_mac_address())
 
         if self.hop_type.to_gateway:
+            self.flows[-1].add_match('in_port', self.flows[-1].switch.get_port_by_name("sfc-br-ex").port_no)
+            # self.flows[-1].add_action("SET_FIELD", "eth_dst", self.dest_tap.get_mac_address())
             self.flows[-1].add_action("OUTPUT", self.flows[-1].switch.get_port_by_name("tun0").port_no)
         else:
+            self.flows[-1].add_match('in_port', self.flows[-1].switch.get_core_to_edge_port())
+            self.flows[-1].add_match('eth_dst', self.hop_id)
+            self.flows[-1].add_action("SET_FIELD", "eth_dst", self.dest_tap.get_mac_address())
             self.flows[-1].add_action("OUTPUT", self.flows[-1].switch.get_port_by_name(self.dest_tap.get_name()).port_no)
 
 class HopClassification(object):
