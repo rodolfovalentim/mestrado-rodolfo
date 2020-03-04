@@ -7,6 +7,7 @@ from netaddr.strategy.eui48 import mac_unix_expanded
 
 import daiquiri
 import logging
+import random
 
 daiquiri.setup(level=logging.INFO)
 logger = daiquiri.getLogger(__name__)
@@ -68,6 +69,7 @@ class ForwardingGraphHop(object):
         self.switch_graph = kwargs.get('switch_graph', None)
         self.prev_hop = kwargs.get('prev_hop', None)
         self.next_hop = kwargs.get('next_hop', None)
+        self.segment_id = kwargs.get('segment_id', None)
         self.hop_id = kwargs.get('hop_id', None)
         self.hop_type = kwargs.get('hop_type', HopClassification())
 
@@ -124,7 +126,7 @@ class ForwardingGraphHop(object):
         if self.src_switch.dpid != self.dest_switch.dpid:
             self.switch_graph = domain_graph.dijkstra(self.src_switch, self.dest_switch)[1:]
  
-    def get_keyflow_data(self, adjmatrix):
+    def get_underlay_data(self, adjmatrix):
         if self.switch_graph is None:
             return
             
@@ -238,3 +240,101 @@ class KeyFlow(object):
         return key
 
     # print(chinese_remainder([11, 19], [7, 5]), hex(chinese_remainder([11, 19], [7, 5])))
+    @staticmethod
+    def create_flow(hop):
+        hop.flows = [Flow()]
+        hop.flows[0].switch = hop.src_switch
+        hop.flows[0].set_match(hop.flow_classifier.get_match())
+
+        if hop.hop_type.from_gateway:
+            hop.flows[0].add_match('in_port', hop.flows[0].switch.get_port_by_name("tun0").port_no)
+            hop.flows[0].add_action("SET_FIELD", "eth_dst", hop.hop_id)
+            hop.flows[0].add_action("OUTPUT", hop.flows[0].switch.get_port_by_name("sfc-br-ex").port_no)
+        else:
+            hop.flows[0].add_match('in_port', hop.flows[0].switch.get_port_by_name(hop.src_tap.get_name()).port_no)
+            
+            if hop.hop_type.same_host:
+                hop.flows[0].add_action("SET_FIELD", "eth_dst", hop.dest_tap.get_mac_address())
+                hop.flows[0].add_action("OUTPUT", hop.flows[0].switch.get_port_by_name(hop.dest_tap.get_name()).port_no)
+                return
+        
+            hop.flows[0].add_action("SET_FIELD", "eth_dst", hop.hop_id)
+            hop.flows[0].add_action("OUTPUT", hop.flows[0].switch.get_edge_to_core_port())
+        
+        hop.flows += [Flow()]
+        hop.flows[-1].switch = hop.dest_switch
+        hop.flows[-1].add_match('eth_dst', hop.hop_id)
+
+        if hop.hop_type.to_gateway:
+            hop.flows[-1].add_match('in_port', hop.flows[-1].switch.get_port_by_name("sfc-br-ex").port_no)
+            hop.flows[-1].add_action("OUTPUT", hop.flows[-1].switch.get_port_by_name("tun0").port_no)
+        else:
+            hop.flows[-1].add_match('in_port', hop.flows[-1].switch.get_core_to_edge_port())
+            hop.flows[-1].add_action("SET_FIELD", "eth_dst", hop.dest_tap.get_mac_address())
+            hop.flows[-1].add_action("OUTPUT", hop.flows[-1].switch.get_port_by_name(hop.dest_tap.get_name()).port_no)
+
+
+class Sourcey(object):
+    code = "91"
+
+    @staticmethod
+    def encode(port_list):
+
+        mac_address = 0
+        mac = EUI(mac_address)
+        mac[0] = 0x91
+
+        assert len(port_list) < 5
+
+        for idx, value in enumerate(port_list):
+            mac[idx + 1] = value
+
+        mac.dialect = mac_unix_expanded
+        key = str(mac)
+        return key
+
+    @staticmethod
+    def rand_mac():
+        return "19:%02x:%02x:%02x:%02x:%02x" % (
+                random.randint(0, 255),
+                random.randint(0, 255),
+                random.randint(0, 255),
+                random.randint(0, 255),
+                random.randint(0, 255)
+            )
+
+    @staticmethod
+    def create_flow(hop):
+        hop.flows = [Flow()]
+        hop.flows[0].switch = hop.src_switch
+        hop.flows[0].set_match(hop.flow_classifier.get_match())
+
+        if hop.hop_type.from_gateway:
+            hop.flows[0].add_match('in_port', hop.flows[0].switch.get_port_by_name("tun0").port_no)
+            hop.flows[0].add_action("SET_FIELD", "eth_src", hop.segment_id)
+            hop.flows[0].add_action("SET_FIELD", "eth_dst", hop.hop_id)
+            hop.flows[0].add_action("OUTPUT", hop.flows[0].switch.get_port_by_name("sfc-br-ex").port_no)
+        else:
+            hop.flows[0].add_match('in_port', hop.flows[0].switch.get_port_by_name(hop.src_tap.get_name()).port_no)
+            
+            if hop.hop_type.same_host:
+                hop.flows[0].add_action("SET_FIELD", "eth_dst", hop.dest_tap.get_mac_address())
+                hop.flows[0].add_action("OUTPUT", hop.flows[0].switch.get_port_by_name(hop.dest_tap.get_name()).port_no)
+                return
+        
+            hop.flows[0].add_action("SET_FIELD", 'eth_src', hop.segment_id)
+            hop.flows[0].add_action("SET_FIELD", "eth_dst", hop.hop_id)
+            hop.flows[0].add_action("OUTPUT", hop.flows[0].switch.get_edge_to_core_port())
+        
+        hop.flows += [Flow()]
+        hop.flows[-1].switch = hop.dest_switch
+        hop.flows[-1].add_match('eth_src', hop.segment_id)
+
+        if hop.hop_type.to_gateway:
+            hop.flows[-1].add_match('in_port', hop.flows[-1].switch.get_port_by_name("sfc-br-ex").port_no)
+            hop.flows[-1].add_action("OUTPUT", hop.flows[-1].switch.get_port_by_name("tun0").port_no)
+        else:
+            hop.flows[-1].add_match('in_port', hop.flows[-1].switch.get_core_to_edge_port())
+            hop.flows[-1].add_action("SET_FIELD", "eth_src", hop.dest_tap.get_mac_address())
+            hop.flows[-1].add_action("SET_FIELD", "eth_dst", hop.dest_tap.get_mac_address())
+            hop.flows[-1].add_action("OUTPUT", hop.flows[-1].switch.get_port_by_name(hop.dest_tap.get_name()).port_no)

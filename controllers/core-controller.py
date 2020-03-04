@@ -58,13 +58,20 @@ class CoreController(app_manager.RyuApp):
         if not new_key:
             return
 
-        # install the table-miss flow entry.
+        # install keyflow match 
         match = parser.OFPMatch(
             eth_dst=("90:00:00:00:00:00", "FF:00:00:00:00:00"))
         actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER,
                                           ofproto.OFPCML_NO_BUFFER)]
         self.logger.info("Switch %s has key %s" % (datapath.id, new_key))
         self.dpid_to_key[datapath.id] = new_key
+        self.add_flow(datapath, 100, match, actions)
+
+        # install sourcey match
+        match = parser.OFPMatch(
+            eth_dst=("91:00:00:00:00:00", "FF:00:00:00:00:00"))
+        actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER,
+                                          ofproto.OFPCML_NO_BUFFER)]
         self.add_flow(datapath, 100, match, actions)
 
         # install the table-miss flow entry.
@@ -87,50 +94,53 @@ class CoreController(app_manager.RyuApp):
         if pkt_keyflow.dst[0:2] == '90':
             self._handle_keyflow(datapath, port, pkt_keyflow, pkt)
             return
+        elif pkt_keyflow.dst[0:2] == '91':
+            self._handle_sourcey(datapath, port, pkt_keyflow, pkt)
+            return
         elif pkt_keyflow.dst == '01:80:c2:00:00:0e':
             return
-        else:
-            ofproto = datapath.ofproto
-            parser = datapath.ofproto_parser
-            # get Datapath ID to identify OpenFlow switches.
-            dpid = datapath.id
-            self.mac_to_port.setdefault(dpid, {})
+        # else:
+        #     ofproto = datapath.ofproto
+        #     parser = datapath.ofproto_parser
+        #     # get Datapath ID to identify OpenFlow switches.
+        #     dpid = datapath.id
+        #     self.mac_to_port.setdefault(dpid, {})
 
-            # analyse the received packets using the packet library.
-            pkt = packet.Packet(msg.data)
-            eth_pkt = pkt.get_protocol(ethernet.ethernet)
-            dst = eth_pkt.dst
-            src = eth_pkt.src
+        #     # analyse the received packets using the packet library.
+        #     pkt = packet.Packet(msg.data)
+        #     eth_pkt = pkt.get_protocol(ethernet.ethernet)
+        #     dst = eth_pkt.dst
+        #     src = eth_pkt.src
 
-            # get the received port number from packet_in message.
-            in_port = msg.match['in_port']
+        #     # get the received port number from packet_in message.
+        #     in_port = msg.match['in_port']
 
-            self.logger.info("packet in %s %s %s %s", dpid, src, dst, in_port)
+        #     self.logger.info("packet in %s %s %s %s", dpid, src, dst, in_port)
 
-            # learn a mac address to avoid FLOOD next time.
-            self.mac_to_port[dpid][src] = in_port
+        #     # learn a mac address to avoid FLOOD next time.
+        #     self.mac_to_port[dpid][src] = in_port
 
-            # if the destination mac address is already learned,
-            # decide which port to output the packet, otherwise FLOOD.
-            if dst in self.mac_to_port[dpid]:
-                out_port = self.mac_to_port[dpid][dst]
-            else:
-                out_port = ofproto.OFPP_FLOOD
+        #     # if the destination mac address is already learned,
+        #     # decide which port to output the packet, otherwise FLOOD.
+        #     if dst in self.mac_to_port[dpid]:
+        #         out_port = self.mac_to_port[dpid][dst]
+        #     else:
+        #         out_port = ofproto.OFPP_FLOOD
 
-            # construct action list.
-            actions = [parser.OFPActionOutput(out_port)]
+        #     # construct action list.
+        #     actions = [parser.OFPActionOutput(out_port)]
 
-            # install a flow to avoid packet_in next time.
-            if out_port != ofproto.OFPP_FLOOD:
-                match = parser.OFPMatch(in_port=in_port, eth_dst=dst)
-                self.add_flow(datapath, 1, match, actions)
+        #     # install a flow to avoid packet_in next time.
+        #     if out_port != ofproto.OFPP_FLOOD:
+        #         match = parser.OFPMatch(in_port=in_port, eth_dst=dst)
+        #         self.add_flow(datapath, 1, match, actions)
 
-            # construct packet_out message and send it.
-            out = parser.OFPPacketOut(datapath=datapath,
-                                    buffer_id=ofproto.OFP_NO_BUFFER,
-                                    in_port=in_port, actions=actions,
-                                    data=msg.data)
-            datapath.send_msg(out)
+        #     # construct packet_out message and send it.
+        #     out = parser.OFPPacketOut(datapath=datapath,
+        #                             buffer_id=ofproto.OFP_NO_BUFFER,
+        #                             in_port=in_port, actions=actions,
+        #                             data=msg.data)
+        #     datapath.send_msg(out)
 
     def _handle_keyflow(self, datapath, port, pkt_keyflow, pkt):
         # self.logger.info("packet-in %s" % (pkt,))
@@ -146,10 +156,32 @@ class CoreController(app_manager.RyuApp):
         output_port = route_key % switch_key
 
         self.logger.info("Inserting flow packets from %s with key %s output to %s" % (
-            datapath.id, switch_key, output_port,))
+            datapath.id, switch_key, output_port))
 
         actions = [parser.OFPActionOutput(
             output_port, ofproto.OFPCML_NO_BUFFER)]
+        self.add_flow(datapath, 101, match, actions)
+        return
+
+    def _handle_sourcey(self, datapath, port, pkt_sourcey, pkt):
+        # self.logger.info("packet-in %s" % (pkt,))
+        ofproto = datapath.ofproto
+        parser = datapath.ofproto_parser
+
+        # install the table-miss flow entry.
+        match = parser.OFPMatch(
+            in_port=port, eth_dst=(pkt_sourcey.dst))
+
+        output_port = int(pkt_sourcey.dst[3:5], 16)
+        new_mac = pkt_sourcey.dst[0:2] + pkt_sourcey.dst[5:] + ":00"
+
+        self.logger.info("Inserting flow packets from %s output to %s" % (
+            datapath.id, output_port,))
+
+        actions = [parser.OFPActionSetField(eth_dst=new_mac)]
+        actions += [parser.OFPActionOutput(
+            output_port, ofproto.OFPCML_NO_BUFFER)]
+
         self.add_flow(datapath, 101, match, actions)
         return
 

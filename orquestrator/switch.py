@@ -154,6 +154,9 @@ class Flow(object):
         elif match_type == 'eth_dst':
             self.match["eth_dst"] = argv[0]
             self.match["eth_type"] = 2048
+        elif match_type == 'eth_src':
+            self.match["eth_src"] = argv[0]
+            self.match["eth_type"] = 2048
         elif match_type == 'in_port':
             self.match["in_port"] = argv[0]
         return self.match

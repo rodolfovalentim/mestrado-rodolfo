@@ -101,7 +101,9 @@ if __name__ == "__main__":
         # 'destination_port': 80,
         'protocol': 'icmp',
         'destination_cloud': cloud2
-    }, service_chain=[dpi, nat, edge_fw1, edge_fw2])
+        }, service_chain=[dpi, nat, edge_fw1, edge_fw2],
+        method='keyflow'
+    )
 
     chain2 = orq.create_chain(flow_classifier={
         'source_ip': '10.83.1.15',
@@ -111,7 +113,9 @@ if __name__ == "__main__":
         # 'destination_port': 80,
         'protocol': 'icmp',
         'destination_cloud': cloud1
-    }, service_chain=[])
+        }, service_chain=[],
+        method='sourcey'
+    )
 
     input("Press any key to quit...")
 

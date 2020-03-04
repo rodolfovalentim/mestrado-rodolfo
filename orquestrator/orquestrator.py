@@ -6,7 +6,7 @@ from .nfv import DomainForwardingGraph, ForwardingGraphHop, VirtualNetworkFuncti
 from .switch import Flow, Link, Switch
 from pprint import pprint
 import queue
-from orquestrator.nfv import AdjacencyMatrix, KeyFlow
+from orquestrator.nfv import AdjacencyMatrix, KeyFlow, Sourcey
 
 daiquiri.setup(level=logging.INFO)
 logger = daiquiri.getLogger(__name__)
@@ -82,7 +82,7 @@ def find_switch(cloud, ip):
     return target_switch
 
 
-def create_chain(flow_classifier, service_chain, simetric=False):
+def create_chain(flow_classifier, service_chain, method='keyflow'):
     fgds = [DomainForwardingGraph()]
     fgds[-1].nfvi_pop = flow_classifier["source_cloud"]
     fgds[-1].domain_graph = create_domain_graph(fgds[-1].nfvi_pop)
@@ -141,14 +141,27 @@ def create_chain(flow_classifier, service_chain, simetric=False):
         adjmatrix = AdjacencyMatrix(domain_links)
         for hop in fgd.hops:
             hop.create_graph(fgd.domain_graph)
-            hop.get_keyflow_data(adjmatrix)
-            key = KeyFlow.chinese_remainder(hop.keys, hop.ports)
-            hop.hop_id = KeyFlow.encode(key)
+            hop.get_underlay_data(adjmatrix)
+
+            if method == 'keyflow':
+                key = KeyFlow.chinese_remainder(hop.keys, hop.ports)
+                hop.hop_id = KeyFlow.encode(key)
+            elif method == 'sourcey':
+                hop.segment_id = Sourcey.rand_mac()
+                hop.hop_id = Sourcey.encode(hop.ports)
+            elif method == 'mpls':
+                pass
+
             logging.warning(hop.hop_id)
 
     for fgd in fgds:
         for hop in fgd.hops:
-            hop.create_flow()
+            if method == 'keyflow':
+                KeyFlow.create_flow(hop)
+            elif method == 'sourcey':
+                Sourcey.create_flow(hop)
+            elif method == 'mpls':
+                pass
 
         src_vm = flow_classifier["source_cloud"].find_virtual_machine_by_ip(flow_classifier["source_ip"])
         dst_vm = flow_classifier["destination_cloud"].find_virtual_machine_by_ip(flow_classifier["destination_ip"])
@@ -156,13 +169,11 @@ def create_chain(flow_classifier, service_chain, simetric=False):
         if fgd.prev_fgd is None:
             fgd.create_arp(src_vm, dst_vm)
         
-        # TODO: Tem que remover essa parte pq a volta deve ser uma nova chain
-        # if fgd.next_fgd is None:
-            # fgd.create_arp(dst_vm, src_vm)
-
     for fgd in fgds:
         for hop in fgd.hops:
             logger.warning(hop.hop_type)
+            logger.info(hop.flows)
+
             if hop.hop_type.from_gateway or hop.hop_type.to_gateway:
                 if hop.hop_type.from_gateway:
                     fgd.nfvi_pop.gateway_controller.add_flow(hop.flows[0].get_flow())
@@ -179,7 +190,6 @@ def create_chain(flow_classifier, service_chain, simetric=False):
                     fgd.nfvi_pop.ofctl_controller.add_flow(flow.get_flow())
 
         for flow in fgd.arp_flows:
-            logger.info(flow.get_flow())
             fgd.nfvi_pop.edge_controller.add_arp_reply(flow.get_flow())
     
     return fgds
