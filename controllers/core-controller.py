@@ -23,17 +23,18 @@ logging.basicConfig()
 
 core_instance_name = 'core_api_app'
 
+
 class CoreController(app_manager.RyuApp):
     _CONTEXTS = {
         'wsgi': WSGIApplication
     }
-    
+
     OFP_VERSIONS = [ofproto_v1_0.OFP_VERSION,
                     ofproto_v1_2.OFP_VERSION,
                     ofproto_v1_3.OFP_VERSION,
                     ofproto_v1_4.OFP_VERSION,
                     ofproto_v1_5.OFP_VERSION]
- 
+
     def __init__(self, *args, **kwargs):
         super(CoreController, self).__init__(*args, **kwargs)
         self.logger.info("Init of Core Controller...")
@@ -58,7 +59,7 @@ class CoreController(app_manager.RyuApp):
         if not new_key:
             return
 
-        # install keyflow match 
+        # install keyflow match
         match = parser.OFPMatch(
             eth_dst=("90:00:00:00:00:00", "FF:00:00:00:00:00"))
         actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER,
@@ -151,7 +152,7 @@ class CoreController(app_manager.RyuApp):
         match = parser.OFPMatch(
             in_port=port, eth_dst=(pkt_keyflow.dst))
 
-        route_key = self.mac_to_int(pkt_keyflow.dst[3:11])  
+        route_key = self.mac_to_int(pkt_keyflow.dst[3:11])
         switch_key = self.dpid_to_key[datapath.id]
         output_port = route_key % switch_key
 
@@ -160,7 +161,7 @@ class CoreController(app_manager.RyuApp):
 
         actions = [parser.OFPActionOutput(
             output_port, ofproto.OFPCML_NO_BUFFER)]
-        self.add_flow(datapath, 101, match, actions)
+        self.add_flow(datapath, 101, match, actions, idle_timeout=10)
         return
 
     def _handle_sourcey(self, datapath, port, pkt_sourcey, pkt):
@@ -182,10 +183,10 @@ class CoreController(app_manager.RyuApp):
         actions += [parser.OFPActionOutput(
             output_port, ofproto.OFPCML_NO_BUFFER)]
 
-        self.add_flow(datapath, 101, match, actions)
+        self.add_flow(datapath, 101, match, actions, idle_timeout=10)
         return
 
-    def add_flow(self, datapath, priority, match, actions):
+    def add_flow(self, datapath, priority, match, actions, idle_timeout=0):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
 
@@ -193,7 +194,8 @@ class CoreController(app_manager.RyuApp):
         inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS,
                                              actions)]
         mod = parser.OFPFlowMod(datapath=datapath, priority=priority,
-                                match=match, instructions=inst)
+                                idle_timeout=idle_timeout, match=match,
+                                instructions=inst)
         datapath.send_msg(mod)
         return
 
@@ -233,19 +235,19 @@ class RestController(ControllerBase):
         body = {}
         for switch in get_switch(self.core_app, None):
             if hex(switch.dp.id)[2:].zfill(16) == dpid:
-                body = {'dpid': hex(switch.dp.id)[2:].zfill(16), 
-                'ip': switch.dp.socket.getpeername()[0], 
-                'key': self.core_app.dpid_to_key.get(switch.dp.id)}
+                body = {'dpid': hex(switch.dp.id)[2:].zfill(16),
+                        'ip': switch.dp.socket.getpeername()[0],
+                        'key': self.core_app.dpid_to_key.get(switch.dp.id)}
                 return Response(content_type='application/json', json=body)
         return Response("Not found", 404)
-        
+
     def _switches(self):
         dpid = None
         switches = get_switch(self.core_app, dpid)
-        body = [{'dpid': hex(switch.dp.id)[2:].zfill(16), 
-                'ip': switch.dp.socket.getpeername()[0], 
-                'key': self.core_app.dpid_to_key.get(switch.dp.id)} for switch in switches]
-        
+        body = [{'dpid': hex(switch.dp.id)[2:].zfill(16),
+                 'ip': switch.dp.socket.getpeername()[0],
+                 'key': self.core_app.dpid_to_key.get(switch.dp.id)} for switch in switches]
+
         print(body)
 
         return Response(content_type='application/json', json=body)

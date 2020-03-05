@@ -56,14 +56,14 @@ class Switch(object):
         return False
 
     def get_core_to_edge_port(self):
-        f = lambda x, switch: switch.name == 'int-br-ex' and switch or x
+        def f(x, switch): return switch.name == 'int-br-ex' and switch or x
         port = reduce(f, self.ports)
 
         assert port is not None
         return port.port_no
 
     def get_edge_to_core_port(self):
-        f = lambda x, switch: switch.name == 'int-br-ex' and switch or x
+        def f(x, switch): return switch.name == 'int-br-ex' and switch or x
         port = reduce(f, self.ports)
 
         assert port is not None
@@ -93,6 +93,12 @@ class Flow(object):
             "cookie": 1,
             "priority": self.priority,
             "match": self.match,
+            "instructions": [
+                {
+                    "type": "APPLY_ACTIONS",
+                    "actions": self.actions
+                }
+            ],
             "actions": self.actions
         }
 
@@ -107,7 +113,6 @@ class Flow(object):
 
     def get_actions(self):
         return self.actions
-
 
     def add_match(self, match_type, *argv):
         if match_type == 'tcp_src':
@@ -159,6 +164,9 @@ class Flow(object):
             self.match["eth_type"] = 2048
         elif match_type == 'in_port':
             self.match["in_port"] = argv[0]
+        elif match_type == "mpls_label":
+            self.match["mpls_label"] = argv[0]
+            self.match["eth_type"] = 34887
         return self.match
 
     def add_action(self, action_type, *argv):
@@ -205,7 +213,7 @@ class Flow(object):
         elif action_type == 'POP_MPLS':
             # Pop the outer MPLS tag with "ethertype"
             self.actions.append(
-                {"type": "POP_MPLS", "ethertype": 2054}
+                {"type": "POP_MPLS", "ethertype": 2048}
             )
         elif action_type == 'SET_QUEUE':
             # Set queue id using "queue_id" when outputting to a port
@@ -228,12 +236,14 @@ class Flow(object):
                 {"type": "DEC_NW_TTL"}
             )
         elif action_type == 'SET_FIELD':
-            # Set a "field" using "value" (The set of keywords available for "field" is the same as match field) 
+            # Set a "field" using "value" (The set of keywords available for "field" is the same as match field)
             # See Example of set-field action
             action = {
                 "type": "SET_FIELD",
-                "field": argv[0],     # Ex: Set VLAN_VID, VLAN_PCP, eth_src, eth_src, ipv4_src, ipv4_dst, NW_TOS, TP_SRC, TP_DST
-                "value": argv[1]      # Describe sum of vlan_id(e.g. 6) | OFPVID_PRESENT(0x1000=4096)
+                # Ex: Set VLAN_VID, VLAN_PCP, eth_src, eth_src, ipv4_src, ipv4_dst, mpls_label
+                "field": argv[0],
+                # Describe sum of vlan_id(e.g. 6) | OFPVID_PRESENT(0x1000=4096)
+                "value": argv[1]
             }
             self.actions.append(action)
         elif action_type == 'PUSH_PBB':
@@ -285,7 +295,7 @@ class Flow(object):
                     {"type": "POP_VLAN", }, {"type": "OUTPUT", "port": 2}]}
             )
         elif action_type == 'CLEAR_ACTIONS':
-        #   self.actions.append((Instruction) Clears all actions the datapath action set
+            #   self.actions.append((Instruction) Clears all actions the datapath action set
             self.actions.append(
                 {"type": "CLEAR_ACTIONS"}
             )

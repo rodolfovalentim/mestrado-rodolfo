@@ -81,7 +81,7 @@ if __name__ == "__main__":
                                            vnf_type="edge_firewall_2",
                                            may_exist=True)
 
-    dst = orq.create_virtual_function(cloud=cloud1,
+    dst = orq.create_virtual_function(cloud=cloud2,
                                       name='dst',
                                       availability_zone='nova:controller',
                                       vnf_type="dst",
@@ -101,7 +101,7 @@ if __name__ == "__main__":
         # 'destination_port': 80,
         'protocol': 'icmp',
         'destination_cloud': cloud2
-        }, service_chain=[dpi, nat, edge_fw1, edge_fw2],
+    }, service_chain=[dpi, nat, edge_fw1, edge_fw2],
         method='keyflow'
     )
 
@@ -113,11 +113,11 @@ if __name__ == "__main__":
         # 'destination_port': 80,
         'protocol': 'icmp',
         'destination_cloud': cloud1
-        }, service_chain=[],
-        method='sourcey'
+    }, service_chain=[],
+        method='keyflow'
     )
 
-    input("Press any key to quit...")
+    input("Press any key to undo flows...")
 
     orq.del_chain(chain1)
     orq.del_chain(chain2)

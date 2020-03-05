@@ -6,7 +6,8 @@ from .nfv import DomainForwardingGraph, ForwardingGraphHop, VirtualNetworkFuncti
 from .switch import Flow, Link, Switch
 from pprint import pprint
 import queue
-from orquestrator.nfv import AdjacencyMatrix, KeyFlow, Sourcey
+from orquestrator.nfv import AdjacencyMatrix, KeyFlow, NetworkingSFC, Sourcey
+import random
 
 daiquiri.setup(level=logging.INFO)
 logger = daiquiri.getLogger(__name__)
@@ -77,8 +78,6 @@ def find_switch(cloud, ip):
             if switch.dpid == switch_data['dpid']:
                 target_switch = switch
 
-
-
     return target_switch
 
 
@@ -88,8 +87,10 @@ def create_chain(flow_classifier, service_chain, method='keyflow'):
     fgds[-1].domain_graph = create_domain_graph(fgds[-1].nfvi_pop)
     fgds[-1].hops.append(ForwardingGraphHop())
 
-    source_switch = find_switch(flow_classifier["source_cloud"], flow_classifier["source_ip"])
-    src_vm = flow_classifier["source_cloud"].find_virtual_machine_by_ip(flow_classifier["source_ip"])
+    source_switch = find_switch(
+        flow_classifier["source_cloud"], flow_classifier["source_ip"])
+    src_vm = flow_classifier["source_cloud"].find_virtual_machine_by_ip(
+        flow_classifier["source_ip"])
     fgds[-1].hops[-1].src_tap = src_vm.get_tap()
     fgds[-1].hops[-1].src_switch = source_switch
 
@@ -99,13 +100,15 @@ def create_chain(flow_classifier, service_chain, method='keyflow'):
             fgds[-1].prev_fgd.next_fgd = fgds[-1]
             fgds[-1].nfvi_pop = vnf.get_cloud()
             fgds[-1].domain_graph = create_domain_graph(fgds[-1].nfvi_pop)
-            fgds[-1].hops.append(ForwardingGraphHop(src_tap=fgds[-1].prev_fgd.hops[-1].dest_tap, prev_hop=fgds[-1].prev_fgd.hops[-1]))
-            fgds[-1].hops[-1].prev_hop.next_hop = fgds[-1].prev_fgd.hops[-1]  
-            
+            fgds[-1].hops.append(ForwardingGraphHop(
+                src_tap=fgds[-1].prev_fgd.hops[-1].dest_tap, prev_hop=fgds[-1].prev_fgd.hops[-1]))
+            fgds[-1].hops[-1].prev_hop.next_hop = fgds[-1].prev_fgd.hops[-1]
+
         target_switch = find_switch(vnf.get_cloud(), vnf.get_ip())
         fgds[-1].hops[-1].dest_tap = vnf.get_tap()
         fgds[-1].hops[-1].dest_switch = target_switch
-        fgds[-1].hops.append(ForwardingGraphHop(src_tap=fgds[-1].hops[-1].dest_tap, prev_hop=fgds[-1].hops[-1]))
+        fgds[-1].hops.append(ForwardingGraphHop(
+            src_tap=fgds[-1].hops[-1].dest_tap, prev_hop=fgds[-1].hops[-1]))
         fgds[-1].hops[-1].prev_hop.next_hop = fgds[-1].hops[-1]
         fgds[-1].hops[-1].src_switch = target_switch
 
@@ -114,11 +117,14 @@ def create_chain(flow_classifier, service_chain, method='keyflow'):
         fgds[-1].prev_fgd.next_fgd = fgds[-1]
         fgds[-1].nfvi_pop = flow_classifier["destination_cloud"]
         fgds[-1].domain_graph = create_domain_graph(fgds[-1].nfvi_pop)
-        fgds[-1].hops.append(ForwardingGraphHop(src_tap=fgds[-1].prev_fgd.hops[-1].dest_tap, prev_hop=fgds[-1].prev_fgd.hops[-1]))
-        fgds[-1].hops[-1].prev_hop.next_hop = fgds[-1].prev_fgd.hops[-1]  
+        fgds[-1].hops.append(ForwardingGraphHop(
+            src_tap=fgds[-1].prev_fgd.hops[-1].dest_tap, prev_hop=fgds[-1].prev_fgd.hops[-1]))
+        fgds[-1].hops[-1].prev_hop.next_hop = fgds[-1].prev_fgd.hops[-1]
 
-    dest_switch = find_switch(flow_classifier["destination_cloud"], flow_classifier["destination_ip"])
-    dest_vm = flow_classifier["destination_cloud"].find_virtual_machine_by_ip(flow_classifier["destination_ip"])
+    dest_switch = find_switch(
+        flow_classifier["destination_cloud"], flow_classifier["destination_ip"])
+    dest_vm = flow_classifier["destination_cloud"].find_virtual_machine_by_ip(
+        flow_classifier["destination_ip"])
     fgds[-1].hops[-1].dest_tap = dest_vm.get_tap()
     fgds[-1].hops[-1].dest_switch = dest_switch
 
@@ -127,7 +133,7 @@ def create_chain(flow_classifier, service_chain, method='keyflow'):
             hop.create_flow_classifier(flow_classifier)
             if hop.src_tap is None and fgd.prev_fgd is not None:
                 hop.src_switch = get_gateway_switches(fgd.nfvi_pop)[0]
-                hop.hop_type.from_gateway = True 
+                hop.hop_type.from_gateway = True
 
             if hop.dest_tap is None and fgd.next_fgd is not None:
                 hop.dest_switch = get_gateway_switches(fgd.nfvi_pop)[0]
@@ -135,11 +141,11 @@ def create_chain(flow_classifier, service_chain, method='keyflow'):
 
             if hop.src_switch.dpid == hop.dest_switch.dpid:
                 hop.hop_type.same_host = True
-                    
+
     for fgd in fgds:
         domain_links = get_all_links(fgd.nfvi_pop)
         adjmatrix = AdjacencyMatrix(domain_links)
-        for hop in fgd.hops:
+        for idx, hop in enumerate(fgd.hops):
             hop.create_graph(fgd.domain_graph)
             hop.get_underlay_data(adjmatrix)
 
@@ -149,8 +155,8 @@ def create_chain(flow_classifier, service_chain, method='keyflow'):
             elif method == 'sourcey':
                 hop.segment_id = Sourcey.rand_mac()
                 hop.hop_id = Sourcey.encode(hop.ports)
-            elif method == 'mpls':
-                pass
+            elif method == 'networking_sfc':
+                hop.hop_id = idx + random.randint(200, 500)
 
             logging.warning(hop.hop_id)
 
@@ -160,39 +166,51 @@ def create_chain(flow_classifier, service_chain, method='keyflow'):
                 KeyFlow.create_flow(hop)
             elif method == 'sourcey':
                 Sourcey.create_flow(hop)
-            elif method == 'mpls':
-                pass
+            elif method == 'networking_sfc':
+                NetworkingSFC.create_flow(hop)
 
-        src_vm = flow_classifier["source_cloud"].find_virtual_machine_by_ip(flow_classifier["source_ip"])
-        dst_vm = flow_classifier["destination_cloud"].find_virtual_machine_by_ip(flow_classifier["destination_ip"])
-            
+        src_vm = flow_classifier["source_cloud"].find_virtual_machine_by_ip(
+            flow_classifier["source_ip"])
+        dst_vm = flow_classifier["destination_cloud"].find_virtual_machine_by_ip(
+            flow_classifier["destination_ip"])
+
         if fgd.prev_fgd is None:
             fgd.create_arp(src_vm, dst_vm)
-        
+
     for fgd in fgds:
         for hop in fgd.hops:
             logger.warning(hop.hop_type)
-            logger.info(hop.flows)
 
-            if hop.hop_type.from_gateway or hop.hop_type.to_gateway:
-                if hop.hop_type.from_gateway:
-                    fgd.nfvi_pop.gateway_controller.add_flow(hop.flows[0].get_flow())
-                else:
-                    fgd.nfvi_pop.ofctl_controller.add_flow(hop.flows[0].get_flow())
+            for flow in hop.flows:
+                logger.info(flow.get_flow())
+                fgd.nfvi_pop.ofctl_controller.add_flow(flow.get_flow())
 
-                if hop.hop_type.to_gateway:
-                    fgd.nfvi_pop.gateway_controller.add_flow(hop.flows[-1].get_flow())
-                else:
-                    fgd.nfvi_pop.ofctl_controller.add_flow(hop.flows[-1].get_flow())
-            else:
-                for flow in hop.flows:
-                    logger.info(flow.get_flow())
-                    fgd.nfvi_pop.ofctl_controller.add_flow(flow.get_flow())
+            # if hop.hop_type.from_gateway or hop.hop_type.to_gateway:
+            #     if hop.hop_type.from_gateway:
+            #         fgd.nfvi_pop.gateway_controller.add_flow(
+            #             hop.flows[0].get_flow())
+            #     else:
+            #         fgd.nfvi_pop.ofctl_controller.add_flow(
+            #             hop.flows[0].get_flow())
+
+            #     if hop.hop_type.to_gateway:
+            #         fgd.nfvi_pop.gateway_controller.add_flow(
+            #             hop.flows[-1].get_flow())
+            #     else:
+            #         fgd.nfvi_pop.ofctl_controller.add_flow(
+            #             hop.flows[-1].get_flow())
+
+            #     for flow in hop.flows[1:-1]:
+            #         fgd.nfvi_pop.ofctl_controller.add_flow(flow.get_flow())
+            # else:
+            #     for flow in hop.flows:
+            #         fgd.nfvi_pop.ofctl_controller.add_flow(flow.get_flow())
 
         for flow in fgd.arp_flows:
             fgd.nfvi_pop.edge_controller.add_arp_reply(flow.get_flow())
-    
+
     return fgds
+
 
 def del_chain(fgds):
     for fgd in fgds:
@@ -204,8 +222,9 @@ def del_chain(fgds):
                 print(flow.get_flow())
                 print(fgd.nfvi_pop.ofctl_controller.del_flow(flow.get_flow()))
 
-def get_all_switches(cloud):    
-    all_switches = cloud.topology_controller.get_switches()  
+
+def get_all_switches(cloud):
+    all_switches = cloud.topology_controller.get_switches()
 
     switches = []
     if all_switches is not None:
@@ -219,19 +238,22 @@ def get_all_switches(cloud):
 
     return switches
 
+
 def get_edge_switches(cloud):
-    edge_switches = cloud.edge_controller.get_switches()    
+    edge_switches = cloud.edge_controller.get_switches()
 
     switches = []
     if edge_switches is not None:
         for edge_switch in edge_switches:
-            sw = cloud.topology_controller.get_switches(dpid=edge_switch['dpid'])[0]
+            sw = cloud.topology_controller.get_switches(
+                dpid=edge_switch['dpid'])[0]
             switches.append(Switch(**sw))
 
     return switches
 
+
 def get_core_switches(cloud):
-    core_switches = cloud.core_controller.get_switches()    
+    core_switches = cloud.core_controller.get_switches()
 
     switches = []
     if core_switches is not None:
@@ -244,12 +266,13 @@ def get_core_switches(cloud):
 
 
 def get_gateway_switches(cloud):
-    gateway_switches = cloud.gateway_controller.get_switches()    
+    gateway_switches = cloud.gateway_controller.get_switches()
 
     switches = []
     if gateway_switches is not None:
         for gateway_switch in gateway_switches:
-            sw = cloud.topology_controller.get_switches(gateway_switch['dpid'])[0]
+            sw = cloud.topology_controller.get_switches(
+                gateway_switch['dpid'])[0]
             switches.append(Switch(**sw))
 
     return switches
@@ -290,13 +313,14 @@ def get_gateway_switch(cloud):
     assert switch is not None
     return
 
+
 def create_domain_graph(cloud):
     switches = get_all_switches(cloud)
     links = get_all_links(cloud)
     graph = GraphUndirectedWeighted(switches)
 
     for link in links:
-            graph.add_edge(link.port_src.dpid, link.port_dst.dpid, 1)
+        graph.add_edge(link.port_src.dpid, link.port_dst.dpid, 1)
 
     return graph
 
